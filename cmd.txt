@@ -25,3 +25,6 @@ docker rm account marketplace wallet
 
 # clean
 docker rmi account-service marketplace-service wallet-service
+
+
+

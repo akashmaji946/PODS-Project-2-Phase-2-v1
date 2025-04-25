@@ -93,7 +93,7 @@ def main():
         delete_threads = []
         all_threads = []
         for product_id in product_ids:
-            for _ in range(1):
+            for _ in range(3):
                 t = Thread(target=place_order_thread, args=(user_id, product_id))
                 order_threads.append(t)
                 all_threads.append(t)
@@ -102,7 +102,7 @@ def main():
         # for t in order_threads:
         #     t.join()
 
-        for _ in range(1):
+        for _ in range(3):
             t = Thread(target=delete_order_thread)
             delete_threads.append(t)
             all_threads.append(t)

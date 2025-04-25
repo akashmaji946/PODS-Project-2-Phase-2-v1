@@ -202,9 +202,11 @@ public class Gateway extends AbstractBehavior<Gateway.Command> {
             StringBuilder itemsJson = new StringBuilder("[");
             for (Order.OrderItemInfo item : items) {
                 itemsJson.append(item.toJson()).append(",");
+                // System.out.println(">>>>> Item: " + item.toJson());
             }
             if (!items.isEmpty()) itemsJson.deleteCharAt(itemsJson.length()-1);
             itemsJson.append("]");
+            // System.out.println(">>>>>>>>>>>> OrderInfo: " + items.toString());
             return String.format("{\"order_id\":%d,\"user_id\":%d,\"total_price\":%d,\"status\":\"%s\",\"items\":%s}",
                 orderId, user_id, total_price, status, itemsJson.toString());
         }

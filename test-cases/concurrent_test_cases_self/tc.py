@@ -9,8 +9,8 @@ MARKETPLACE_SERVICE_URL = "http://localhost:8081"
 def main():
     try:
         # Step 1: Create a user
-        user_id = 1234
-        resp = post_user(user_id, "Test User", "testuser@example.com")
+        user_id = 989898
+        resp = post_user(user_id, "Test1  User", "test1user@example.com")
         if not check_response_status_code(resp, 201):
             return False
 
@@ -20,7 +20,7 @@ def main():
             return False
 
         # Step 3: Get initial product info
-        product_id = 109  # Example product ID
+        product_id = 101  # Example product ID
         resp = get_product(product_id)
         if not check_response_status_code(resp, 200):
             return False

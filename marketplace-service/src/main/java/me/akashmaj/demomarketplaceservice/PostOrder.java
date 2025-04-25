@@ -143,6 +143,46 @@ public class PostOrder extends AbstractBehavior<PostOrder.Command> {
             .build();
     }
 
+    // private Behavior<Command> onProductDetailResponse(ProductDetailResponse msg) {
+    //     Gateway.ProductInfo info = msg.productInfo;
+    //     collectedProductInfos.put(info.productId, info);
+    //     pendingProductResponses--;
+    //     if (pendingProductResponses == 0) {
+    //         // All product details received; now compute total cost.
+    //         totalCost = 0;
+    //         for (Map<String, Object> item : items) {
+    //             int prodId = (Integer) item.get("product_id");
+    //             int quantity = (Integer) item.get("quantity");
+    //             Gateway.ProductInfo pi = collectedProductInfos.get(prodId);
+    //             if (pi == null || pi.stock_quantity < quantity) {
+    //                 replyTo.tell(new Gateway.OrderInfo(orderId, 0, 0, "Insufficient stock for product " + prodId, new ArrayList<>()));
+    //                 return Behaviors.stopped();
+    //             }
+    //             totalCost += quantity * pi.price;
+    //         }
+    //         // Query Account Service for discount detail (simulate with isFirstOrder check)
+    //         boolean discountApplicable = !userIdList.contains(userId);
+    //         finalCost = discountApplicable ? (int)(totalCost * 0.9) : totalCost;
+    //         // Debit wallet.
+    //         if (!debitWallet(userId, finalCost)) {
+    //             replyTo.tell(new Gateway.OrderInfo(orderId, 0, 0, "Insufficient wallet balance", new ArrayList<>()));
+    //             return Behaviors.stopped();
+    //         }
+    //         // Move to Phase 2: Reduce stock.
+    //         pendingStockReductionResponses = items.size();
+    //         for (Map<String, Object> item : items) {
+    //             int prodId = (Integer) item.get("product_id");
+    //             int quantity = (Integer) item.get("quantity");
+    //             ActorRef<Product.OperationResponse> adapter = getContext().messageAdapter(Product.OperationResponse.class,
+    //                     op -> new StockReductionResponse(prodId, op));
+    //             EntityRef<Product.Command> productRef = sharding.entityRefFor(Product.ENTITY_TYPE_KEY, String.valueOf(prodId));
+    //             productRef.tell(new Product.ReduceStock(quantity, adapter));
+    //         }
+    //         return waitingForStockReduction();
+    //     }
+    //     return this;
+    // }
+
     private Behavior<Command> onProductDetailResponse(ProductDetailResponse msg) {
         Gateway.ProductInfo info = msg.productInfo;
         collectedProductInfos.put(info.productId, info);
@@ -155,7 +195,7 @@ public class PostOrder extends AbstractBehavior<PostOrder.Command> {
                 int quantity = (Integer) item.get("quantity");
                 Gateway.ProductInfo pi = collectedProductInfos.get(prodId);
                 if (pi == null || pi.stock_quantity < quantity) {
-                    replyTo.tell(new Gateway.OrderInfo(orderId, 0, 0, "Insufficient stock for product " + prodId, new ArrayList<>()));
+                    replyTo.tell(new Gateway.OrderInfo(orderId, 0, 0, "Insufficient stock for product " + prodId, convertItemsToOrderItemInfo(items)));
                     return Behaviors.stopped();
                 }
                 totalCost += quantity * pi.price;
@@ -165,7 +205,7 @@ public class PostOrder extends AbstractBehavior<PostOrder.Command> {
             finalCost = discountApplicable ? (int)(totalCost * 0.9) : totalCost;
             // Debit wallet.
             if (!debitWallet(userId, finalCost)) {
-                replyTo.tell(new Gateway.OrderInfo(orderId, 0, 0, "Insufficient wallet balance", new ArrayList<>()));
+                replyTo.tell(new Gateway.OrderInfo(orderId, 0, 0, "Insufficient wallet balance", convertItemsToOrderItemInfo(items)));
                 return Behaviors.stopped();
             }
             // Move to Phase 2: Reduce stock.
@@ -181,6 +221,17 @@ public class PostOrder extends AbstractBehavior<PostOrder.Command> {
             return waitingForStockReduction();
         }
         return this;
+    }
+    
+    // Helper method to convert List<Map<String, Object>> to List<Order.OrderItemInfo>
+    private List<Order.OrderItemInfo> convertItemsToOrderItemInfo(List<Map<String, Object>> items) {
+        List<Order.OrderItemInfo> orderItemInfos = new ArrayList<>();
+        for (Map<String, Object> item : items) {
+            int productId = (Integer) item.get("product_id");
+            int quantity = (Integer) item.get("quantity");
+            orderItemInfos.add(new Order.OrderItemInfo(0, productId, quantity)); // Assuming `id` is not required here
+        }
+        return orderItemInfos;
     }
 
     // --- Phase 2 state: Waiting for stock reduction responses ---
@@ -206,7 +257,7 @@ public class PostOrder extends AbstractBehavior<PostOrder.Command> {
                 }
                 EntityRef<Order.Command> orderRef = sharding.entityRefFor(Order.ENTITY_TYPE_KEY, String.valueOf(orderId));
                 orderRef.tell(new Order.PlaceOrder(orderId, userId, finalCost, orderItems));
-                replyTo.tell(new Gateway.OrderInfo(orderId, userId, finalCost, "PLACED", new ArrayList<>()));
+                replyTo.tell(new Gateway.OrderInfo(orderId, userId, finalCost, "PLACED", convertItemsToOrderItemInfo(items)));
                 return Behaviors.stopped();
             } else {
                 // At least one stock reduction failed; perform compensation.
