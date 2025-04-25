@@ -1,0 +1,176 @@
+package me.akashmaj.demomarketplaceservice;
+
+import akka.actor.typed.ActorRef;
+import akka.actor.typed.javadsl.*;
+import akka.actor.typed.Behavior;
+import akka.cluster.sharding.typed.javadsl.EntityTypeKey;
+import me.akashmaj.demomarketplaceservice.Gateway.GetProduct;
+import me.akashmaj.demomarketplaceservice.Product.OperationResponse;
+// import me.akashmaj.demomarketplaceservice.Gateway.GetProduct;
+import akka.cluster.sharding.typed.javadsl.ClusterSharding;
+import akka.cluster.sharding.typed.javadsl.EntityRef;
+
+public class Product extends AbstractBehavior<Product.Command> {
+
+    public static final EntityTypeKey<Command> ENTITY_TYPE_KEY = EntityTypeKey.create(Command.class, "Product");
+
+    private final ClusterSharding sharding;
+    private int id;
+    private String name;
+    private String description;
+    private int price;
+    private int stock_quantity;
+
+    public static Behavior<Command> create(ClusterSharding sharding) {
+        return Behaviors.setup(context -> new Product(context, sharding, 0, "Default", "Default Description", 0, 0));
+    }
+
+    private Product(ActorContext<Command> context, ClusterSharding sharding, int id, String name, String description, int price, int stock_quantity) {
+        super(context);
+        this.sharding = sharding;
+        this.id = id;
+        this.name = name;
+        this.description = description;
+        this.price = price;
+        this.stock_quantity = stock_quantity;
+    }
+
+ 
+
+    @Override
+    public Receive<Command> createReceive() {
+        return newReceiveBuilder()
+            .onMessage(InitializeProduct.class, this::onInitializeProduct)
+            .onMessage(GetProduct.class, this::onGetProduct)
+            .onMessage(GetProductInfo.class, this::onGetProductInfo)
+            .onMessage(ReduceStock.class, this::onReduceStock)
+            .onMessage(RestoreStock.class, this::onRestoreStock)
+            .build();
+    }
+
+    public static class RestoreStock implements Command {
+        public final int quantity;
+        public final ActorRef<OperationResponse> replyTo;
+
+        public RestoreStock(int quantity, ActorRef<OperationResponse> replyTo) {
+            this.quantity = quantity;
+            this.replyTo = replyTo;
+        }
+    }
+
+  
+
+    public static class GetProduct implements Command {
+        public final int productId;
+        public final ActorRef<Gateway.ProductInfo> replyTo;
+    
+        public GetProduct(int productId, ActorRef<Gateway.ProductInfo> replyTo) {
+            this.productId = productId;
+            this.replyTo = replyTo;
+        }
+    }
+
+    private Behavior<Command> onInitializeProduct(InitializeProduct msg) {
+        this.id = msg.id;
+        this.name = msg.name;
+        this.description = msg.description;
+        this.price = msg.price;
+        this.stock_quantity = msg.stockQuantity;
+        getContext().getLog().info("Product {} initialized: {}", id, name);
+        return this;
+    }
+
+    private Behavior<Command> onGetProduct(GetProduct msg) {
+        EntityRef<Product.Command> productRef = sharding.entityRefFor(Product.ENTITY_TYPE_KEY, String.valueOf(msg.productId));
+
+        // Send an initialization message if this is the first time the product is accessed.
+        productRef.tell(new Product.InitializeProduct(msg.productId, "Product " + msg.productId, "Description for product " + msg.productId, 100, 50));
+
+        productRef.tell(new Product.GetProductInfo(msg.productId, msg.replyTo));
+        return this;
+    }
+
+
+    
+
+    private Behavior<Command> onGetProductInfo(GetProductInfo msg) {
+        msg.replyTo.tell(new Gateway.ProductInfo(id, name, description, price, stock_quantity));
+        return this;
+    }
+
+    private Behavior<Command> onReduceStock(ReduceStock msg) {
+        if (stock_quantity >= msg.quantity) {
+            stock_quantity -= msg.quantity;
+            msg.replyTo.tell(new OperationResponse(true, "Stock reduced", stock_quantity));
+        } else {
+            msg.replyTo.tell(new OperationResponse(false, "Insufficient stock", stock_quantity));
+        }
+        return this;
+    }
+
+    private Behavior<Command> onRestoreStock(RestoreStock msg) {
+        stock_quantity += msg.quantity;
+        msg.replyTo.tell(new OperationResponse(true, "Stock restored", stock_quantity));
+        return this;
+    }
+
+    public interface Command {}
+
+    public static class InitializeProduct implements Command {
+        public final int id;
+        public final String name;
+        public final String description;
+        public final int price;
+        public final int stockQuantity;
+
+        public InitializeProduct(int id, String name, String description, int price, int stockQuantity) {
+            this.id = id;
+            this.name = name;
+            this.description = description;
+            this.price = price;
+            this.stockQuantity = stockQuantity;
+        }
+    }
+
+    public static class GetProductInfo implements Command {
+        public final int productId;
+        public final ActorRef<Gateway.ProductInfo> replyTo;
+
+        public GetProductInfo(int productId, ActorRef<Gateway.ProductInfo> replyTo) {
+            this.productId = productId;
+            this.replyTo = replyTo;
+        }
+    }
+
+    public static class ReduceStock implements Command {
+        public final int quantity;
+        public final ActorRef<OperationResponse> replyTo;
+
+        public ReduceStock(int quantity, ActorRef<OperationResponse> replyTo) {
+            this.quantity = quantity;
+            this.replyTo = replyTo;
+        }
+    }
+
+    // public static class RestoreStock implements Command {
+    //     public final int quantity;
+    //     public final ActorRef<OperationResponse> replyTo;
+
+    //     public RestoreStock(int quantity, ActorRef<OperationResponse> replyTo) {
+    //         this.quantity = quantity;
+    //         this.replyTo = replyTo;
+    //     }
+    // }
+
+    public static class OperationResponse {
+        public final boolean success;
+        public final String message;
+        public final int currentStock;
+
+        public OperationResponse(boolean success, String message, int currentStock) {
+            this.success = success;
+            this.message = message;
+            this.currentStock = currentStock;
+        }
+    }
+}

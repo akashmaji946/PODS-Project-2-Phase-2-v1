@@ -1,0 +1,16 @@
+
+=> [1m[34mPOST[0m /users
+   {'id': 5001, 'name': 'Bob Market', 'email': 'bobysunny@market.com'}
+<= [1mHTTP 201 (Created)[0m
+   {'id': 5001, 'name': 'Bob Market', 'email': 'bobysunny@market.com', 'discount_availed': False}
+
+   [32m[1mPass[0m: HTTP status code expected 201, got 201
+
+=> [1m[34mPUT[0m /wallets/5001
+   {'action': 'credit', 'amount': 300000000}
+<= [1mHTTP 200 (OK)[0m
+   {'user_id': 5001, 'balance': 300000000}
+
+   [32m[1mPass[0m: HTTP status code expected 200, got 200
+
+=> [1m[34mGET[0m http://localhost:8081/products/101

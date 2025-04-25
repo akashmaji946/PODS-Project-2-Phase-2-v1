@@ -1,0 +1,27 @@
+# build
+docker build -t account-service .
+docker build -t marketplace-service .
+docker build -t wallet-service .
+
+
+# deploy
+docker run -p 8080:8080 --rm --name account \
+                        --add-host=host.docker.internal:host-gateway \
+                        account-service &
+
+docker run -p 8081:8080 --rm --name marketplace \
+                        --add-host=host.docker.internal:host-gateway \
+                        marketplace-service &
+
+docker run -p 8082:8080 --rm --name wallet \
+                        --add-host=host.docker.internal:host-gateway \
+                        wallet-service &
+
+# stop
+docker stop account marketplace wallet
+
+# remove
+docker rm account marketplace wallet
+
+# clean
+docker rmi account-service marketplace-service wallet-service
