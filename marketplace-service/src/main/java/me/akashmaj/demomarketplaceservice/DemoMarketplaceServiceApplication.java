@@ -157,7 +157,7 @@ public class DemoMarketplaceServiceApplication {
         );
         server.setExecutor(threadPoolExecutor);
         server.start();
-        System.out.println(">>> HTTP server started on port 8081 localhost <<<");
+        System.out.println(">>> HTTP server started on port 8081 localhost");
     }
 
         private static void spawnWorkerActors(akka.actor.typed.javadsl.ActorContext<Void> context, ClusterSharding sharding, Scheduler scheduler) {

@@ -3,12 +3,9 @@ package me.akashmaj.demomarketplaceservice;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import akka.actor.typed.ActorRef;
-import akka.actor.typed.javadsl.*;
 import akka.actor.typed.Behavior;
+import akka.actor.typed.javadsl.*;
 import akka.cluster.sharding.typed.javadsl.EntityTypeKey;
-import me.akashmaj.demomarketplaceservice.Gateway.GetProduct;
-import me.akashmaj.demomarketplaceservice.Product.OperationResponse;
-// import me.akashmaj.demomarketplaceservice.Gateway.GetProduct;
 import akka.cluster.sharding.typed.javadsl.ClusterSharding;
 import akka.cluster.sharding.typed.javadsl.EntityRef;
 
@@ -37,8 +34,6 @@ public class Product extends AbstractBehavior<Product.Command> {
         this.stock_quantity = stock_quantity;
     }
 
- 
-
     @Override
     public Receive<Command> createReceive() {
         return newReceiveBuilder()
@@ -48,28 +43,6 @@ public class Product extends AbstractBehavior<Product.Command> {
             .onMessage(ReduceStock.class, this::onReduceStock)
             .onMessage(RestoreStock.class, this::onRestoreStock)
             .build();
-    }
-
-    public static class RestoreStock implements Command {
-        public final int quantity;
-        public final ActorRef<OperationResponse> replyTo;
-
-        public RestoreStock(int quantity, ActorRef<OperationResponse> replyTo) {
-            this.quantity = quantity;
-            this.replyTo = replyTo;
-        }
-    }
-
-  
-
-    public static class GetProduct implements Command {
-        public final int productId;
-        public final ActorRef<Gateway.ProductInfo> replyTo;
-    
-        public GetProduct(int productId, ActorRef<Gateway.ProductInfo> replyTo) {
-            this.productId = productId;
-            this.replyTo = replyTo;
-        }
     }
 
     private Behavior<Command> onInitializeProduct(InitializeProduct msg) {
@@ -91,9 +64,6 @@ public class Product extends AbstractBehavior<Product.Command> {
         productRef.tell(new Product.GetProductInfo(msg.productId, msg.replyTo));
         return this;
     }
-
-
-    
 
     private Behavior<Command> onGetProductInfo(GetProductInfo msg) {
         msg.replyTo.tell(new Gateway.ProductInfo(id, name, description, price, stock_quantity));
@@ -141,11 +111,29 @@ public class Product extends AbstractBehavior<Product.Command> {
         }
     }
 
+    public static class GetProduct implements Command {
+        public final int productId;
+        public final ActorRef<Gateway.ProductInfo> replyTo;
+
+        @JsonCreator
+        public GetProduct(
+            @JsonProperty("productId") int productId,
+            @JsonProperty("replyTo") ActorRef<Gateway.ProductInfo> replyTo
+        ) {
+            this.productId = productId;
+            this.replyTo = replyTo;
+        }
+    }
+
     public static class GetProductInfo implements Command {
         public final int productId;
         public final ActorRef<Gateway.ProductInfo> replyTo;
 
-        public GetProductInfo(int productId, ActorRef<Gateway.ProductInfo> replyTo) {
+        @JsonCreator
+        public GetProductInfo(
+            @JsonProperty("productId") int productId,
+            @JsonProperty("replyTo") ActorRef<Gateway.ProductInfo> replyTo
+        ) {
             this.productId = productId;
             this.replyTo = replyTo;
         }
@@ -155,28 +143,41 @@ public class Product extends AbstractBehavior<Product.Command> {
         public final int quantity;
         public final ActorRef<OperationResponse> replyTo;
 
-        public ReduceStock(int quantity, ActorRef<OperationResponse> replyTo) {
+        @JsonCreator
+        public ReduceStock(
+            @JsonProperty("quantity") int quantity,
+            @JsonProperty("replyTo") ActorRef<OperationResponse> replyTo
+        ) {
             this.quantity = quantity;
             this.replyTo = replyTo;
         }
     }
 
-    // public static class RestoreStock implements Command {
-    //     public final int quantity;
-    //     public final ActorRef<OperationResponse> replyTo;
+    public static class RestoreStock implements Command {
+        public final int quantity;
+        public final ActorRef<OperationResponse> replyTo;
 
-    //     public RestoreStock(int quantity, ActorRef<OperationResponse> replyTo) {
-    //         this.quantity = quantity;
-    //         this.replyTo = replyTo;
-    //     }
-    // }
+        @JsonCreator
+        public RestoreStock(
+            @JsonProperty("quantity") int quantity,
+            @JsonProperty("replyTo") ActorRef<OperationResponse> replyTo
+        ) {
+            this.quantity = quantity;
+            this.replyTo = replyTo;
+        }
+    }
 
     public static class OperationResponse {
         public final boolean success;
         public final String message;
         public final int currentStock;
 
-        public OperationResponse(boolean success, String message, int currentStock) {
+        @JsonCreator
+        public OperationResponse(
+            @JsonProperty("success") boolean success,
+            @JsonProperty("message") String message,
+            @JsonProperty("currentStock") int currentStock
+        ) {
             this.success = success;
             this.message = message;
             this.currentStock = currentStock;

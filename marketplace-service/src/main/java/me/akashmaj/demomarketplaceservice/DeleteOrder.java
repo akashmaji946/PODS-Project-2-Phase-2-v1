@@ -81,29 +81,6 @@ public class DeleteOrder extends AbstractBehavior<DeleteOrder.Command> {
         }
     }
 
-    // private Behavior<Command> onCancelOrderResponse(CancelOrderResponse response) {
-    //     if (replyTo == null) {
-    //         getContext().getLog().warn("replyTo is null. Skipping response.");
-    //         return Behaviors.stopped();
-    //     }
-    
-    //     Gateway.OrderInfo info = response.orderInfo;
-    
-    //     if ("CANCELLED".equals(info.status)) {
-    //         // Restore stock for each product in the canceled order
-    //         for (Order.OrderItemInfo item : info.items) {
-    //             EntityRef<Product.Command> productRef = sharding.entityRefFor(Product.ENTITY_TYPE_KEY, String.valueOf(item.product_id));
-    //             productRef.tell(new Product.RestoreStock(item.quantity, getContext().getSelf()));
-    //         }
-    
-    //         replyTo.tell(new Gateway.GeneralResponse(true, "Order " + orderId + " cancelled successfully"));
-    //     } else {
-    //         replyTo.tell(new Gateway.GeneralResponse(false, "Failed to cancel order"));
-    //     }
-    
-    //     return Behaviors.stopped();
-    // }
-
     private Behavior<Command> onCancelOrderResponse(CancelOrderResponse response) {
         if (replyTo == null) {
             getContext().getLog().warn("replyTo is null. Skipping response.");
@@ -124,7 +101,8 @@ public class DeleteOrder extends AbstractBehavior<DeleteOrder.Command> {
             replyTo.tell(new Gateway.GeneralResponse(false, "Failed to cancel order"));
         }
     
-        return Behaviors.stopped();
+        // return Behaviors.stopped();
+        return Behaviors.same();
     }
 
     private void refundWallet(int user_id, int amount) {
