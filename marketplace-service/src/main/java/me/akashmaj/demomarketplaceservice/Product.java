@@ -1,5 +1,7 @@
 package me.akashmaj.demomarketplaceservice;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import akka.actor.typed.ActorRef;
 import akka.actor.typed.javadsl.*;
 import akka.actor.typed.Behavior;
@@ -123,7 +125,14 @@ public class Product extends AbstractBehavior<Product.Command> {
         public final int price;
         public final int stockQuantity;
 
-        public InitializeProduct(int id, String name, String description, int price, int stockQuantity) {
+        @JsonCreator
+        public InitializeProduct(
+            @JsonProperty("id") int id,
+            @JsonProperty("name") String name,
+            @JsonProperty("description") String description,
+            @JsonProperty("price") int price,
+            @JsonProperty("stockQuantity") int stockQuantity
+        ) {
             this.id = id;
             this.name = name;
             this.description = description;

@@ -1,9 +1,11 @@
 package me.akashmaj.demomarketplaceservice;
 
 import akka.actor.typed.ActorRef;
-import akka.actor.typed.javadsl.*;
 import akka.actor.typed.Behavior;
+import akka.actor.typed.javadsl.*;
 import akka.cluster.sharding.typed.javadsl.EntityTypeKey;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -102,7 +104,12 @@ public class Order extends AbstractBehavior<Order.Command> {
     public static class GetOrder implements Command {
         public final int orderId;
         public final ActorRef<Gateway.OrderInfo> replyTo;
-        public GetOrder(int orderId, ActorRef<Gateway.OrderInfo> replyTo) {
+
+        @JsonCreator
+        public GetOrder(
+            @JsonProperty("orderId") int orderId,
+            @JsonProperty("replyTo") ActorRef<Gateway.OrderInfo> replyTo
+        ) {
             this.orderId = orderId;
             this.replyTo = replyTo;
         }
@@ -112,7 +119,13 @@ public class Order extends AbstractBehavior<Order.Command> {
         public final int orderId;
         public final String updateData;
         public final ActorRef<Gateway.OrderInfo> replyTo;
-        public UpdateOrder(int orderId, String updateData, ActorRef<Gateway.OrderInfo> replyTo) {
+
+        @JsonCreator
+        public UpdateOrder(
+            @JsonProperty("orderId") int orderId,
+            @JsonProperty("updateData") String updateData,
+            @JsonProperty("replyTo") ActorRef<Gateway.OrderInfo> replyTo
+        ) {
             this.orderId = orderId;
             this.updateData = updateData;
             this.replyTo = replyTo;
@@ -122,7 +135,12 @@ public class Order extends AbstractBehavior<Order.Command> {
     public static class CancelOrder implements Command {
         public final int orderId;
         public final ActorRef<Gateway.OrderInfo> replyTo;
-        public CancelOrder(int orderId, ActorRef<Gateway.OrderInfo> replyTo) {
+
+        @JsonCreator
+        public CancelOrder(
+            @JsonProperty("orderId") int orderId,
+            @JsonProperty("replyTo") ActorRef<Gateway.OrderInfo> replyTo
+        ) {
             this.orderId = orderId;
             this.replyTo = replyTo;
         }
@@ -134,7 +152,13 @@ public class Order extends AbstractBehavior<Order.Command> {
         public final int totalPrice;
         public final List<OrderItem> items;
 
-        public PlaceOrder(int orderId, int userId, int totalPrice, List<OrderItem> items) {
+        @JsonCreator
+        public PlaceOrder(
+            @JsonProperty("orderId") int orderId,
+            @JsonProperty("userId") int userId,
+            @JsonProperty("totalPrice") int totalPrice,
+            @JsonProperty("items") List<OrderItem> items
+        ) {
             this.orderId = orderId;
             this.userId = userId;
             this.totalPrice = totalPrice;
@@ -146,7 +170,13 @@ public class Order extends AbstractBehavior<Order.Command> {
         public final int id;
         public final int product_id;
         public final int quantity;
-        public OrderItem(int id, int product_id, int quantity) {
+
+        @JsonCreator
+        public OrderItem(
+            @JsonProperty("id") int id,
+            @JsonProperty("product_id") int product_id,
+            @JsonProperty("quantity") int quantity
+        ) {
             this.id = id;
             this.product_id = product_id;
             this.quantity = quantity;
@@ -157,11 +187,18 @@ public class Order extends AbstractBehavior<Order.Command> {
         public final int id;
         public final int product_id;
         public final int quantity;
-        public OrderItemInfo(int id, int product_id, int quantity) {
+
+        @JsonCreator
+        public OrderItemInfo(
+            @JsonProperty("id") int id,
+            @JsonProperty("product_id") int product_id,
+            @JsonProperty("quantity") int quantity
+        ) {
             this.id = id;
             this.product_id = product_id;
             this.quantity = quantity;
         }
+
         public String toJson() {
             return String.format("{\"id\":%d,\"product_id\":%d,\"quantity\":%d}", id, product_id, quantity);
         }

@@ -1,6 +1,7 @@
 package me.akashmaj.demomarketplaceservice;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.time.Duration;
@@ -25,9 +26,14 @@ import akka.cluster.sharding.typed.javadsl.ClusterSharding;
 import akka.cluster.sharding.typed.javadsl.Entity;
 import akka.actor.typed.javadsl.AskPattern;
 
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import akka.cluster.sharding.typed.javadsl.EntityRef; 
+import akka.cluster.sharding.typed.javadsl.EntityRef;
 
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
@@ -51,10 +57,7 @@ public class DemoMarketplaceServiceApplication {
             sharding.init(Entity.of(Product.ENTITY_TYPE_KEY, ctx -> Product.create(sharding)));
             sharding.init(Entity.of(Order.ENTITY_TYPE_KEY, ctx -> Order.create()));
 
-            // Initialize sharded entities
-    sharding.init(Entity.of(Product.ENTITY_TYPE_KEY, ctx -> Product.create(sharding)));
-    sharding.init(Entity.of(Order.ENTITY_TYPE_KEY, ctx -> Order.create()));
-
+        
             // Pre-create product actors
             // List<Product.InitializeProduct> products = List.of(
             //     new Product.InitializeProduct(1, "Product 1", "Description for Product 1", 100, 50),
@@ -68,29 +71,39 @@ public class DemoMarketplaceServiceApplication {
             // }
 
             // Pre-create product actors
-            List<Product.InitializeProduct> products = List.of(
-                new Product.InitializeProduct(101, "Laptop Pro 1", "Powerful laptop", 55000, 10),
-                new Product.InitializeProduct(102, "Laptop Air 2", "Lightweight laptop", 45000, 8),
-                new Product.InitializeProduct(103, "Gaming Keyboard", "RGB mechanical keyboard", 3000, 15),
-                new Product.InitializeProduct(104, "Wireless Mouse", "2.4 GHz wireless mouse", 700, 20),
-                new Product.InitializeProduct(105, "Smartphone X", "Android phone with 128GB", 20000, 12),
-                new Product.InitializeProduct(106, "Smart TV", "50-inch 4K UHD", 35000, 5),
-                new Product.InitializeProduct(107, "Headphones", "Noise-cancelling headphones", 3000, 25),
-                new Product.InitializeProduct(108, "Bluetooth Speaker", "Portable and waterproof", 2000, 5),
-                new Product.InitializeProduct(109, "Smartwatch", "Fitness tracking smartwatch", 5000, 10),
-                new Product.InitializeProduct(110, "Tablet Pro", "10-inch tablet", 15000, 7),
-                new Product.InitializeProduct(111, "External HDD", "1TB USB 3.0", 4000, 12),
-                new Product.InitializeProduct(112, "USB-C Charger", "Fast charging adapter", 1200, 16),
-                new Product.InitializeProduct(113, "Electric Kettle", "1.5L stainless steel", 1800, 9),
-                new Product.InitializeProduct(114, "Air Purifier", "HEPA filter device", 6000, 4),
-                new Product.InitializeProduct(115, "Microwave Oven", "20L capacity", 8000, 6),
-                new Product.InitializeProduct(116, "Refrigerator Mini", "100L single door", 12000, 3),
-                new Product.InitializeProduct(117, "Vacuum Cleaner", "Handheld vacuum", 3000, 10),
-                new Product.InitializeProduct(118, "Fitness Band", "Heart rate monitor", 2500, 14),
-                new Product.InitializeProduct(119, "Desktop Monitor", "24-inch LED", 8000, 8),
-                new Product.InitializeProduct(120, "Wireless Earbuds", "Bluetooth 5.0 earbuds", 2500, 15)
-            );
+            // List<Product.InitializeProduct> products = List.of(
+            //     new Product.InitializeProduct(101, "Laptop Pro 1", "Powerful laptop", 55000, 10),
+            //     new Product.InitializeProduct(102, "Laptop Air 2", "Lightweight laptop", 45000, 8),
+            //     new Product.InitializeProduct(103, "Gaming Keyboard", "RGB mechanical keyboard", 3000, 15),
+            //     new Product.InitializeProduct(104, "Wireless Mouse", "2.4 GHz wireless mouse", 700, 20),
+            //     new Product.InitializeProduct(105, "Smartphone X", "Android phone with 128GB", 20000, 12),
+            //     new Product.InitializeProduct(106, "Smart TV", "50-inch 4K UHD", 35000, 5),
+            //     new Product.InitializeProduct(107, "Headphones", "Noise-cancelling headphones", 3000, 25),
+            //     new Product.InitializeProduct(108, "Bluetooth Speaker", "Portable and waterproof", 2000, 5),
+            //     new Product.InitializeProduct(109, "Smartwatch", "Fitness tracking smartwatch", 5000, 10),
+            //     new Product.InitializeProduct(110, "Tablet Pro", "10-inch tablet", 15000, 7),
+            //     new Product.InitializeProduct(111, "External HDD", "1TB USB 3.0", 4000, 12),
+            //     new Product.InitializeProduct(112, "USB-C Charger", "Fast charging adapter", 1200, 16),
+            //     new Product.InitializeProduct(113, "Electric Kettle", "1.5L stainless steel", 1800, 9),
+            //     new Product.InitializeProduct(114, "Air Purifier", "HEPA filter device", 6000, 4),
+            //     new Product.InitializeProduct(115, "Microwave Oven", "20L capacity", 8000, 6),
+            //     new Product.InitializeProduct(116, "Refrigerator Mini", "100L single door", 12000, 3),
+            //     new Product.InitializeProduct(117, "Vacuum Cleaner", "Handheld vacuum", 3000, 10),
+            //     new Product.InitializeProduct(118, "Fitness Band", "Heart rate monitor", 2500, 14),
+            //     new Product.InitializeProduct(119, "Desktop Monitor", "24-inch LED", 8000, 8),
+            //     new Product.InitializeProduct(120, "Wireless Earbuds", "Bluetooth 5.0 earbuds", 2500, 15)
+            // );
 
+            // for (Product.InitializeProduct product : products) {
+            //     EntityRef<Product.Command> productRef = sharding.entityRefFor(Product.ENTITY_TYPE_KEY, String.valueOf(product.id));
+            //     productRef.tell(product);
+            // }
+
+
+            // Load products from Excel file
+            List<Product.InitializeProduct> products = loadProductsFromExcel("products.xlsx");
+
+            // Send products to sharded actors
             for (Product.InitializeProduct product : products) {
                 EntityRef<Product.Command> productRef = sharding.entityRefFor(Product.ENTITY_TYPE_KEY, String.valueOf(product.id));
                 productRef.tell(product);
@@ -113,6 +126,29 @@ public class DemoMarketplaceServiceApplication {
         httpClient = HttpClient.newHttpClient();
     }
 
+        private static List<Product.InitializeProduct> loadProductsFromExcel(String fileName) {
+        List<Product.InitializeProduct> products = new ArrayList<>();
+        try (InputStream inputStream = DemoMarketplaceServiceApplication.class.getClassLoader().getResourceAsStream(fileName);
+             Workbook workbook = new XSSFWorkbook(inputStream)) {
+
+            Sheet sheet = workbook.getSheetAt(0); // Assuming the first sheet contains the data
+            for (Row row : sheet) {
+                if (row.getRowNum() == 0) continue; // Skip header row
+
+                int id = (int) row.getCell(0).getNumericCellValue();
+                String name = row.getCell(1).getStringCellValue();
+                String description = row.getCell(2).getStringCellValue();
+                int price = (int) row.getCell(3).getNumericCellValue();
+                int stock = (int) row.getCell(4).getNumericCellValue();
+
+                products.add(new Product.InitializeProduct(id, name, description, price, stock));
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return products;
+    }
+
     private static void startHttpServer(ActorRef<Gateway.Command> gateway, ActorSystem<?> system) throws IOException {
         HttpServer server = HttpServer.create(new InetSocketAddress(8081), 1000);
         server.createContext("/", new HttpHandlerImpl(gateway));
@@ -121,7 +157,7 @@ public class DemoMarketplaceServiceApplication {
         );
         server.setExecutor(threadPoolExecutor);
         server.start();
-        System.out.println(">>> HTTP server started on port 8081 localhost");
+        System.out.println(">>> HTTP server started on port 8081 localhost <<<");
     }
 
         private static void spawnWorkerActors(akka.actor.typed.javadsl.ActorContext<Void> context, ClusterSharding sharding, Scheduler scheduler) {
