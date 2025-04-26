@@ -2,6 +2,7 @@ package me.akashmaj.demomarketplaceservice;
 
 import akka.actor.typed.ActorRef;
 import akka.actor.typed.javadsl.*;
+import akka.actor.typed.receptionist.ServiceKey;
 import akka.actor.typed.Behavior;
 import akka.cluster.sharding.typed.javadsl.ClusterSharding;
 import akka.cluster.sharding.typed.javadsl.EntityRef;
@@ -13,7 +14,14 @@ import java.net.http.HttpResponse.BodyHandlers;
 import java.util.HashMap;
 import java.util.Map;
 
+import akka.cluster.sharding.typed.javadsl.EntityTypeKey;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty; 
+
 public class DeleteOrder extends AbstractBehavior<DeleteOrder.Command> {
+
+    public static final EntityTypeKey<Command> ENTITY_TYPE_KEY = EntityTypeKey.create(Command.class, "DeleteOrder");
+    public static final ServiceKey<Command> SERVICE_KEY = ServiceKey.create(Command.class, "DeleteOrderService");
 
     // Message interface for DeleteOrder.
     public interface Command {}
@@ -95,7 +103,7 @@ public class DeleteOrder extends AbstractBehavior<DeleteOrder.Command> {
                 EntityRef<Product.Command> productRef = sharding.entityRefFor(Product.ENTITY_TYPE_KEY, String.valueOf(item.product_id));
                 productRef.tell(new Product.RestoreStock(item.quantity, stockResponseAdapter));
             }
-    
+            refundWallet(info.user_id, info.total_price);
             replyTo.tell(new Gateway.GeneralResponse(true, "Order " + orderId + " cancelled successfully"));
         } else {
             replyTo.tell(new Gateway.GeneralResponse(false, "Failed to cancel order"));

@@ -3,6 +3,7 @@ package me.akashmaj.demomarketplaceservice;
 import akka.actor.typed.ActorRef;
 import akka.actor.typed.Scheduler;
 import akka.actor.typed.javadsl.*;
+import akka.actor.typed.receptionist.ServiceKey;
 import akka.actor.typed.Behavior;
 import akka.cluster.sharding.typed.javadsl.ClusterSharding;
 import akka.cluster.sharding.typed.javadsl.EntityRef;
@@ -15,8 +16,14 @@ import java.net.http.HttpResponse.BodyHandlers;
 import java.util.*;
 import java.util.stream.Collectors;
 
-public class PostOrder extends AbstractBehavior<PostOrder.Command> {
+import akka.cluster.sharding.typed.javadsl.EntityTypeKey;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty; 
 
+public class PostOrder extends AbstractBehavior<PostOrder.Command> {
+    public static final EntityTypeKey<Command> ENTITY_TYPE_KEY = EntityTypeKey.create(Command.class, "PostOrder");
+    public static final ServiceKey<Command> SERVICE_KEY = ServiceKey.create(Command.class, "PostOrderService");
+    
     public interface Command {}
     public static final class Initialize implements Command {}
 
@@ -216,7 +223,15 @@ public class PostOrder extends AbstractBehavior<PostOrder.Command> {
                 ActorRef<Product.OperationResponse> adapter = getContext().messageAdapter(Product.OperationResponse.class,
                         op -> new StockReductionResponse(prodId, op));
                 EntityRef<Product.Command> productRef = sharding.entityRefFor(Product.ENTITY_TYPE_KEY, String.valueOf(prodId));
-                productRef.tell(new Product.ReduceStock(quantity, adapter));
+                
+                if(productRef != null) {
+                    productRef.tell(new Product.ReduceStock(quantity, adapter));
+                } else {
+                    refundWallet(userId, finalCost);
+                    replyTo.tell(new Gateway.OrderInfo(orderId, 0, 0, "Product not found: " + prodId, convertItemsToOrderItemInfo(items)));
+                    return Behaviors.stopped();
+                }
+
             }
             return waitingForStockReduction();
         }
@@ -248,6 +263,9 @@ public class PostOrder extends AbstractBehavior<PostOrder.Command> {
         if (pendingStockReductionResponses == 0) {
             boolean allSuccess = stockReductionResults.values().stream().allMatch(s -> s);
             if (allSuccess) {
+
+                updateUserDiscount(userId, false);
+
                 // All stock reductions succeeded.
                 List<Order.OrderItem> orderItems = new ArrayList<>();
                 for (Map<String, Object> item : items) {
@@ -262,6 +280,14 @@ public class PostOrder extends AbstractBehavior<PostOrder.Command> {
             } else {
                 // At least one stock reduction failed; perform compensation.
                 refundWallet(userId, finalCost);
+                for (Map<String, Object> item : items) {
+                    int prodId = (Integer) item.get("product_id");
+                    int quantity = (Integer) item.get("quantity");
+                    EntityRef<Product.Command> productRef = sharding.entityRefFor(Product.ENTITY_TYPE_KEY, String.valueOf(prodId));
+                    productRef.tell(new Product.RestoreStock(quantity,
+                                    getContext().messageAdapter(Product.OperationResponse.class, 
+                                            op -> new StockReductionResponse(prodId, op))));
+                }
                 replyTo.tell(new Gateway.OrderInfo(orderId, 0, 0, "Stock reduction failed, order cancelled", new ArrayList<>()));
                 return Behaviors.stopped();
             }
@@ -269,17 +295,74 @@ public class PostOrder extends AbstractBehavior<PostOrder.Command> {
         return this;
     }
 
+
     private boolean debitWallet(int user_id, int amount) {
-        // Implementation for debiting wallet
-        return true;
+        try {
+            Map<String, Object> data = new HashMap<>();
+            data.put("action", "debit");
+            data.put("amount", amount);
+            String json = objectMapper.writeValueAsString(data);
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(new URI("http://localhost:8082/wallets/" + user_id))
+                    .header("Content-Type", "application/json")
+                    .PUT(HttpRequest.BodyPublishers.ofString(json))
+                    .build();
+            HttpResponse<String> response = DemoMarketplaceServiceApplication.httpClient.send(request, BodyHandlers.ofString());
+            return response.statusCode() == 200;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
     }
 
     private void refundWallet(int user_id, int amount) {
-        // Implementation for refunding wallet
+        try {
+            Map<String, Object> data = new HashMap<>();
+            data.put("action", "credit");
+            data.put("amount", amount);
+            String json = objectMapper.writeValueAsString(data);
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(new URI("http://localhost:8082/wallets/" + user_id))
+                    .header("Content-Type", "application/json")
+                    .PUT(HttpRequest.BodyPublishers.ofString(json))
+                    .build();
+            DemoMarketplaceServiceApplication.httpClient.send(request, BodyHandlers.ofString());
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void updateUserDiscount(int user_id, boolean discountAvailed) {
+        try {
+            Map<String, Object> data = new HashMap<>();
+            data.put("id", user_id);
+            data.put("discount_availed", discountAvailed);
+            String json = objectMapper.writeValueAsString(data);
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(new URI("http://localhost:8080/users"))
+                    .header("Content-Type", "application/json")
+                    .PUT(HttpRequest.BodyPublishers.ofString(json))
+                    .build();
+            DemoMarketplaceServiceApplication.httpClient.send(request, BodyHandlers.ofString());
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     private int getUser(int user_id) {
-        // Implementation for getting user details
-        return 200;
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(new URI("http://localhost:8080/users/" + user_id))
+                    .header("Content-Type", "application/json")
+                    .GET()
+                    .build();
+            HttpResponse<String> response = DemoMarketplaceServiceApplication.httpClient.send(request, BodyHandlers.ofString());
+            System.out.println("Response: " + response.body());
+            return response.statusCode();
+        } catch (Exception e) {
+            e.printStackTrace();
+            return 404;
+        }
     }
+
 }

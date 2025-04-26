@@ -33,12 +33,14 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import akka.cluster.sharding.typed.javadsl.EntityRef;
 
+import akka.cluster.sharding.typed.javadsl.EntityRef;
+import akka.actor.typed.javadsl.Routers;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SpringBootApplication
 public class DemoMarketplaceServiceApplication {
+
     public static ActorSystem<Void> system;
     public static Duration askTimeout;
     public static Scheduler scheduler;
@@ -51,72 +53,60 @@ public class DemoMarketplaceServiceApplication {
                                      .withFallback(ConfigFactory.load("application.conf"));
 
         system = ActorSystem.create(Behaviors.setup(context -> {
+
+            // ClusterSharding sharding = ClusterSharding.get(context.getSystem());
+
+            // // Initialize sharded entities
+            // sharding.init(Entity.of(Product.ENTITY_TYPE_KEY, ctx -> Product.create(sharding)));
+            // sharding.init(Entity.of(Order.ENTITY_TYPE_KEY, ctx -> Order.create()));
+
+    
+            // // Load products from Excel file
+            // List<Product.InitializeProduct> products = loadProductsFromExcel("products.xlsx");
+
+            // // Send products to sharded actors
+            // for (Product.InitializeProduct product : products) {
+            //     EntityRef<Product.Command> productRef = sharding.entityRefFor(Product.ENTITY_TYPE_KEY, String.valueOf(product.id));
+            //     productRef.tell(product);
+            //     context.getLog().info("Sent init to product shard {}", product.id);
+            // }
+
+            // // If primary node (port 8083), start HTTP server and Gateway actor
+            // if ("8083".equals(port)) {
+            //     ActorRef<Gateway.Command> gateway = context.spawn(Gateway.create(), "Gateway");
+            //     startHttpServer(gateway, context.getSystem());
+            // }
+
+            // // Spawn worker actors for GroupRouter
+            // spawnWorkerActors(context, sharding, scheduler);
+
             ClusterSharding sharding = ClusterSharding.get(context.getSystem());
 
-            // Initialize sharded entities
+            // Initialize sharded entities (MUST be done by every node)
             sharding.init(Entity.of(Product.ENTITY_TYPE_KEY, ctx -> Product.create(sharding)));
             sharding.init(Entity.of(Order.ENTITY_TYPE_KEY, ctx -> Order.create()));
 
-        
-            // Pre-create product actors
-            // List<Product.InitializeProduct> products = List.of(
-            //     new Product.InitializeProduct(1, "Product 1", "Description for Product 1", 100, 50),
-            //     new Product.InitializeProduct(2, "Product 2", "Description for Product 2", 200, 30),
-            //     new Product.InitializeProduct(3, "Product 3", "Description for Product 3", 150, 20)
-            // );
-
-            // for (Product.InitializeProduct product : products) {
-            //     EntityRef<Product.Command> productRef = sharding.entityRefFor(Product.ENTITY_TYPE_KEY, String.valueOf(product.id));
-            //     productRef.tell(product);
-            // }
-
-            // Pre-create product actors
-            // List<Product.InitializeProduct> products = List.of(
-            //     new Product.InitializeProduct(101, "Laptop Pro 1", "Powerful laptop", 55000, 10),
-            //     new Product.InitializeProduct(102, "Laptop Air 2", "Lightweight laptop", 45000, 8),
-            //     new Product.InitializeProduct(103, "Gaming Keyboard", "RGB mechanical keyboard", 3000, 15),
-            //     new Product.InitializeProduct(104, "Wireless Mouse", "2.4 GHz wireless mouse", 700, 20),
-            //     new Product.InitializeProduct(105, "Smartphone X", "Android phone with 128GB", 20000, 12),
-            //     new Product.InitializeProduct(106, "Smart TV", "50-inch 4K UHD", 35000, 5),
-            //     new Product.InitializeProduct(107, "Headphones", "Noise-cancelling headphones", 3000, 25),
-            //     new Product.InitializeProduct(108, "Bluetooth Speaker", "Portable and waterproof", 2000, 5),
-            //     new Product.InitializeProduct(109, "Smartwatch", "Fitness tracking smartwatch", 5000, 10),
-            //     new Product.InitializeProduct(110, "Tablet Pro", "10-inch tablet", 15000, 7),
-            //     new Product.InitializeProduct(111, "External HDD", "1TB USB 3.0", 4000, 12),
-            //     new Product.InitializeProduct(112, "USB-C Charger", "Fast charging adapter", 1200, 16),
-            //     new Product.InitializeProduct(113, "Electric Kettle", "1.5L stainless steel", 1800, 9),
-            //     new Product.InitializeProduct(114, "Air Purifier", "HEPA filter device", 6000, 4),
-            //     new Product.InitializeProduct(115, "Microwave Oven", "20L capacity", 8000, 6),
-            //     new Product.InitializeProduct(116, "Refrigerator Mini", "100L single door", 12000, 3),
-            //     new Product.InitializeProduct(117, "Vacuum Cleaner", "Handheld vacuum", 3000, 10),
-            //     new Product.InitializeProduct(118, "Fitness Band", "Heart rate monitor", 2500, 14),
-            //     new Product.InitializeProduct(119, "Desktop Monitor", "24-inch LED", 8000, 8),
-            //     new Product.InitializeProduct(120, "Wireless Earbuds", "Bluetooth 5.0 earbuds", 2500, 15)
-            // );
-
-            // for (Product.InitializeProduct product : products) {
-            //     EntityRef<Product.Command> productRef = sharding.entityRefFor(Product.ENTITY_TYPE_KEY, String.valueOf(product.id));
-            //     productRef.tell(product);
-            // }
-
-
-            // Load products from Excel file
-            List<Product.InitializeProduct> products = loadProductsFromExcel("products.xlsx");
-
-            // Send products to sharded actors
-            for (Product.InitializeProduct product : products) {
-                EntityRef<Product.Command> productRef = sharding.entityRefFor(Product.ENTITY_TYPE_KEY, String.valueOf(product.id));
-                productRef.tell(product);
-            }
-
-            // If primary node (port 8083), start HTTP server and Gateway actor
+            // Only primary node will load products
             if ("8083".equals(port)) {
-                ActorRef<Gateway.Command> gateway = context.spawn(Gateway.create(), "Gateway");
-                startHttpServer(gateway, context.getSystem());
+                // Load products from Excel file
+                List<Product.InitializeProduct> products = loadProductsFromExcel("products.xlsx");
+
+                // Send products to sharded actors
+                for (Product.InitializeProduct product : products) {
+                    EntityRef<Product.Command> productRef = sharding.entityRefFor(Product.ENTITY_TYPE_KEY, String.valueOf(product.id));
+                    productRef.tell(product);
+                    context.getLog().info("Sent init to product shard {}", product.id);
+                }
+
+                spawnWorkerActors(context, sharding, scheduler);
+
+                // Start HTTP server and Gateway actor
+                // ActorRef<Gateway.Command> gateway = context.spawn(Gateway.create(), "Gateway");
+                // startHttpServer(gateway, context.getSystem());
             }
 
-            // Spawn worker actors for GroupRouter
-            spawnWorkerActors(context, sharding, scheduler);
+            // Spawn worker actors (can be done by any node)
+            // spawnWorkerActors(context, sharding, scheduler);
 
             return Behaviors.empty();
         }), "ClusterSystem", config);
@@ -157,17 +147,46 @@ public class DemoMarketplaceServiceApplication {
         );
         server.setExecutor(threadPoolExecutor);
         server.start();
-        System.out.println(">>> HTTP server started on port 8081 localhost");
+        System.out.println(">>> HTTP server started on port 8081 <<<");
     }
 
-        private static void spawnWorkerActors(akka.actor.typed.javadsl.ActorContext<Void> context, ClusterSharding sharding, Scheduler scheduler) {
-            for (int i = 0; i < 50; i++) {
-                // Replace with appropriate arguments for PostOrder
-                context.spawn(PostOrder.create("{}", null, sharding, i, new ArrayList<>(), scheduler), "PostOrder-" + i);
+        // private static void spawnWorkerActors(akka.actor.typed.javadsl.ActorContext<Void> context, ClusterSharding sharding, Scheduler scheduler) {
+        //     for (int i = 0; i < 50; i++) {
+        //         // Replace with appropriate arguments for PostOrder
+        //         context.spawn(PostOrder.create("{}", null, sharding, i, new ArrayList<>(), scheduler), "PostOrder-" + i);
 
-                // Replace with appropriate arguments for DeleteOrder
+        //         // Replace with appropriate arguments for DeleteOrder
+        //         context.spawn(DeleteOrder.create(i, null, sharding), "DeleteOrder-" + i);
+        //     }
+        // }
+
+        private static void spawnWorkerActors(akka.actor.typed.javadsl.ActorContext<Void> context, ClusterSharding sharding, Scheduler scheduler) 
+        throws IOException {
+            // Create PostOrder workers
+            for (int i = 0; i < 50; i++) {
+                context.spawn(PostOrder.create("{}", null, sharding, i, new ArrayList<>(), scheduler), "PostOrder-" + i);
+            }
+        
+            // Register PostOrder GroupRouter
+            ActorRef<PostOrder.Command> postOrderRouter = context.spawn(
+                Routers.group(PostOrder.SERVICE_KEY).withRoundRobinRouting(),
+                "PostOrderRouter"
+            );
+        
+            // Create DeleteOrder workers
+            for (int i = 0; i < 50; i++) {
                 context.spawn(DeleteOrder.create(i, null, sharding), "DeleteOrder-" + i);
             }
+        
+            // Register DeleteOrder GroupRouter
+            ActorRef<DeleteOrder.Command> deleteOrderRouter = context.spawn(
+                Routers.group(DeleteOrder.SERVICE_KEY).withRoundRobinRouting(),
+                "DeleteOrderRouter"
+            );
+        
+            // Pass the routers to the Gateway actor
+            ActorRef<Gateway.Command> gateway = context.spawn(Gateway.create(postOrderRouter, deleteOrderRouter, sharding), "Gateway");
+            startHttpServer(gateway, context.getSystem());
         }
 
     static class HttpHandlerImpl implements HttpHandler {
