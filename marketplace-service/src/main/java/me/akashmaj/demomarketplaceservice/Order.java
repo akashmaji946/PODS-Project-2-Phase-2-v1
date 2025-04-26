@@ -209,6 +209,7 @@ public class Order extends AbstractBehavior<Order.Command> {
         this.items.addAll(msg.items);
 
         if (!userIdList.contains(msg.userId)) {
+            System.out.println(" > Discounted: " + user_id);
             userIdList.add(msg.userId);
         }
 

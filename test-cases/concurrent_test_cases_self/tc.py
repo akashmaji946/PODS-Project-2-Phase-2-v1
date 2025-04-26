@@ -9,8 +9,8 @@ MARKETPLACE_SERVICE_URL = "http://localhost:8081"
 def main():
     try:
         # Step 1: Create a user
-        user_id = 989898
-        resp = post_user(user_id, "Test1  User", "test1user@example.com")
+        user_id = 190
+        resp = post_user(user_id, "Test 6 User", "ak@9.com")
         if not check_response_status_code(resp, 201):
             return False
 
@@ -20,7 +20,7 @@ def main():
             return False
 
         # Step 3: Get initial product info
-        product_id = 101  # Example product ID
+        product_id = 102  # Example product ID
         resp = get_product(product_id)
         if not check_response_status_code(resp, 200):
             return False
@@ -35,32 +35,32 @@ def main():
         order_id = resp.json().get("order_id")
         print(f"Order placed successfully. Order ID: {order_id}")
 
-        # Step 5: Get product info after placing the order
-        resp = get_product(product_id)
-        if not check_response_status_code(resp, 200):
-            return False
-        stock_after_order = resp.json()["stock_quantity"]
-        print(f"Stock after placing order for product {product_id}: {stock_after_order}")
-
-        # Step 6: Cancel the order
+        # Step 5: Cancel the order
         resp = delete_order(order_id)
         if not check_response_status_code(resp, 200):
             return False
         print(f"Order {order_id} canceled successfully.")
 
-        # Step 7: Get product info after canceling the order
+        # Step 6: Place the same order again
+        resp = post_order(user_id, [{"product_id": product_id, "quantity": quantity}])
+        if not check_response_status_code(resp, 201):
+            return False
+        new_order_id = resp.json().get("order_id")
+        print(f"Same order placed again successfully. New Order ID: {new_order_id}")
+
+        # Step 7: Get product info after placing the same order again
         resp = get_product(product_id)
         if not check_response_status_code(resp, 200):
             return False
-        stock_after_cancel = resp.json()["stock_quantity"]
-        print(f"Stock after canceling order for product {product_id}: {stock_after_cancel}")
+        stock_after_new_order = resp.json()["stock_quantity"]
+        print(f"Stock after placing the same order again for product {product_id}: {stock_after_new_order}")
 
         # Step 8: Verify stock consistency
-        expected_stock = initial_stock
-        if stock_after_cancel == expected_stock:
-            print_pass_message(f"Stock consistency verified for product {product_id}.")
+        expected_stock = initial_stock - quantity
+        if stock_after_new_order == expected_stock:
+            print_pass_message(f"Stock consistency verified for product {product_id} after placing the same order again.")
         else:
-            print_fail_message(f"Stock mismatch for product {product_id}: expected {expected_stock}, got {stock_after_cancel}")
+            print_fail_message(f"Stock mismatch for product {product_id}: expected {expected_stock}, got {stock_after_new_order}")
             return False
 
         return True

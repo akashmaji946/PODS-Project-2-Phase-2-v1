@@ -210,6 +210,11 @@ public class PostOrder extends AbstractBehavior<PostOrder.Command> {
             }
             // Query Account Service for discount detail (simulate with isFirstOrder check)
             boolean discountApplicable = !userIdList.contains(userId);
+            // NOTE: REMOVE THIS LINE, HACK
+            userIdList.add(userId);
+
+            System.out.println(" > Discount Applicable: " + discountApplicable);
+
             finalCost = discountApplicable ? (int)(totalCost * 0.9) : totalCost;
             // Debit wallet.
             if (!debitWallet(userId, finalCost)) {
@@ -268,7 +273,7 @@ public class PostOrder extends AbstractBehavior<PostOrder.Command> {
                 try{
 
                     updateUserDiscount(userId, true);
-
+                    
                     int orderItemIdCounter = 1;
                     // All stock reductions succeeded.
                     List<Order.OrderItem> orderItems = new ArrayList<>();

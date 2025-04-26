@@ -10,12 +10,12 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class Gateway extends AbstractBehavior<Gateway.Command> {
-    private  ClusterSharding sharding;
-    private  ActorRef<PostOrder.Command> postOrderRouter;
-    private  ActorRef<DeleteOrder.Command> deleteOrderRouter;
-    private  Map<Integer, ActorRef<Order.Command>> orderActors = new ConcurrentHashMap<>();
-    private  List<Integer> userIdList = new ArrayList<>();
-    private int orderIdCounter = 1; // Simple order ID generator.
+    public  ClusterSharding sharding;
+    public  ActorRef<PostOrder.Command> postOrderRouter;
+    public  ActorRef<DeleteOrder.Command> deleteOrderRouter;
+    public  Map<Integer, ActorRef<Order.Command>> orderActors = new ConcurrentHashMap<>();
+    public  List<Integer> userIdList = new ArrayList<>();
+    public int orderIdCounter = 1; // Simple order ID generator.
 
     // Constructor
     public static Behavior<Command> create(ActorRef<PostOrder.Command> postOrderRouter, ActorRef<DeleteOrder.Command> deleteOrderRouter, ClusterSharding sharding) {

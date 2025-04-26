@@ -142,7 +142,7 @@ public class DemoMarketplaceServiceApplication {
                 context.getSystem().receptionist().tell(Receptionist.register(DeleteOrder.SERVICE_KEY, worker));
             }
 
-            Thread.sleep(2000);
+            // Thread.sleep(2000);
 
             // Register DeleteOrder GroupRouter
             deleteOrderRouter = context.spawn(
@@ -150,7 +150,7 @@ public class DemoMarketplaceServiceApplication {
                 "DeleteOrderRouter"
             );
 
-            Thread.sleep(2000);
+            // Thread.sleep(2000);
 
             // Create PostOrder workers and register them with the receptionist
             for (int i = 0; i < 1000; i++) {
@@ -161,14 +161,14 @@ public class DemoMarketplaceServiceApplication {
                 // Register each PostOrder worker with the receptionist
                 context.getSystem().receptionist().tell(Receptionist.register(PostOrder.SERVICE_KEY, worker));
             }
-            Thread.sleep(2000);
+            // Thread.sleep(2000);
             // Register PostOrder GroupRouter
             postOrderRouter = context.spawn(
                 Routers.group(PostOrder.SERVICE_KEY).withRoundRobinRouting(),
                 "PostOrderRouter"
             );
 
-            Thread.sleep(2000);
+            // Thread.sleep(2000);
 
             // Pass the routers to the Gateway actor
             gateway = context.spawn(
