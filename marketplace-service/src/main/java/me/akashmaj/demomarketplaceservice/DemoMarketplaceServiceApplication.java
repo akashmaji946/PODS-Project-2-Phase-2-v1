@@ -55,6 +55,7 @@ public class DemoMarketplaceServiceApplication {
     public static void main(String[] args) throws IOException {
         // Get port from command-line arguments
         String port = System.getProperty("exec.args", "8083");
+        System.out.println("_______________________________The port number is in arg: " + port);
         Config config = ConfigFactory.parseString("akka.remote.artery.canonical.port=" + port)
                                      .withFallback(ConfigFactory.load("application.conf"));
 
@@ -78,7 +79,7 @@ public class DemoMarketplaceServiceApplication {
                     productRef.tell(product);
                     context.getLog().info("Sent init to product shard {}", product.id);
                 }
-
+                System.out.println("=======================>>>> The port number is: " + port);
                 spawnWorkerActors(context, sharding, scheduler);
 
             }
@@ -126,7 +127,7 @@ public class DemoMarketplaceServiceApplication {
 
         server.setExecutor(threadPoolExecutor);
         server.start();
-        System.out.println(">>> HTTP server started on port 8081 <<<");
+        System.out.println(">>> HTTP server started on port 8081 DOCKER <<<");
     }
 
         private static void spawnWorkerActors(akka.actor.typed.javadsl.ActorContext<Void> context, ClusterSharding sharding, Scheduler scheduler) 

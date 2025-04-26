@@ -1,4 +1,4 @@
-# Demo Marketplace Microservices
+# Marketplace Microservices
 
 This project includes three microservices:
 - **Account Service** (`account-service`)
@@ -11,59 +11,45 @@ These services are built with Spring Boot and Akka Cluster (for marketplace serv
 
 ## 📦 Build & Run Locally
 
-### 1. Account Service
-```bash
-cd account-service
-mvn clean package
-java -jar target/account-service-0.0.1-SNAPSHOT.jar
-```
-
-### 2. Marketplace Service
-```bash
-cd marketplace-service
-mvn clean package
-
-# Start the primary marketplace node
-java -Dexec.args=8083 -jar target/marketplace-service-0.0.1-SNAPSHOT.jar
-
-# Start an additional marketplace node
-java -Dexec.args=8084 -jar target/marketplace-service-0.0.1-SNAPSHOT.jar
-```
-
-### 3. Wallet Service
-```bash
-cd wallet-service
-mvn clean package
-java -jar target/wallet-service-0.0.1-SNAPSHOT.jar
-```
+Refer to the `dev` branch
 
 ---
 
 ## 🐳 Docker Instructions
 
 > **⚠️ Note:** Docker steps are provided for reference only.  
-> **Do not run Docker steps now without changing code (localhost -> host.docker.internal) if running locally.**
+> **Do not run Docker steps now without changing code (:refer this branch:) if running locally.**
 
 ### Build Docker Images
+
 ```bash
-docker build -t account-service ./account-service
-docker build -t marketplace-service ./marketplace-service
-docker build -t wallet-service ./wallet-service
+docker build -t account-service .
+docker build -t marketplace-service .
+docker build -t wallet-service .
 ```
 
 ### Deploy Containers
+Run the two services like this:
 ```bash
 docker run -p 8080:8080 --rm --name account \
            --add-host=host.docker.internal:host-gateway \
-           account-service &
-
-docker run -p 8081:8080 --rm --name marketplace \
-           --add-host=host.docker.internal:host-gateway \
-           marketplace-service &
+           account-service
 
 docker run -p 8082:8080 --rm --name wallet \
            --add-host=host.docker.internal:host-gateway \
-           wallet-service &
+           wallet-service
+```
+Run the marketplace with replicas
+```bash
+docker run --net=host --rm --name marketplace \
+           marketplace-service -Dexec.args=8083
+
+docker run --net=host --rm --name marketplace-2 \
+           marketplace-service -Dexec.args=8084
+
+docker run --net=host --rm --name marketplace-2 \
+           marketplace-service -Dexec.args=8085
+
 ```
 
 ### Stop Running Containers
