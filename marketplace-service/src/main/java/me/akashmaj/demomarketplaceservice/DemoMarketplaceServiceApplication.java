@@ -36,6 +36,8 @@ import java.util.concurrent.CompletableFuture;
 
 import akka.cluster.sharding.typed.javadsl.EntityRef;
 import akka.actor.typed.javadsl.Routers;
+import akka.actor.typed.receptionist.Receptionist;
+import java.lang.Thread;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SpringBootApplication
@@ -45,6 +47,10 @@ public class DemoMarketplaceServiceApplication {
     public static Duration askTimeout;
     public static Scheduler scheduler;
     public static HttpClient httpClient;
+    public static ActorRef<Gateway.Command> gateway;
+    
+    public static ActorRef<PostOrder.Command> postOrderRouter;
+    public static ActorRef<DeleteOrder.Command> deleteOrderRouter;
 
     public static void main(String[] args) throws IOException {
         // Get port from command-line arguments
@@ -54,31 +60,6 @@ public class DemoMarketplaceServiceApplication {
 
         system = ActorSystem.create(Behaviors.setup(context -> {
 
-            // ClusterSharding sharding = ClusterSharding.get(context.getSystem());
-
-            // // Initialize sharded entities
-            // sharding.init(Entity.of(Product.ENTITY_TYPE_KEY, ctx -> Product.create(sharding)));
-            // sharding.init(Entity.of(Order.ENTITY_TYPE_KEY, ctx -> Order.create()));
-
-    
-            // // Load products from Excel file
-            // List<Product.InitializeProduct> products = loadProductsFromExcel("products.xlsx");
-
-            // // Send products to sharded actors
-            // for (Product.InitializeProduct product : products) {
-            //     EntityRef<Product.Command> productRef = sharding.entityRefFor(Product.ENTITY_TYPE_KEY, String.valueOf(product.id));
-            //     productRef.tell(product);
-            //     context.getLog().info("Sent init to product shard {}", product.id);
-            // }
-
-            // // If primary node (port 8083), start HTTP server and Gateway actor
-            // if ("8083".equals(port)) {
-            //     ActorRef<Gateway.Command> gateway = context.spawn(Gateway.create(), "Gateway");
-            //     startHttpServer(gateway, context.getSystem());
-            // }
-
-            // // Spawn worker actors for GroupRouter
-            // spawnWorkerActors(context, sharding, scheduler);
 
             ClusterSharding sharding = ClusterSharding.get(context.getSystem());
 
@@ -100,20 +81,16 @@ public class DemoMarketplaceServiceApplication {
 
                 spawnWorkerActors(context, sharding, scheduler);
 
-                // Start HTTP server and Gateway actor
-                // ActorRef<Gateway.Command> gateway = context.spawn(Gateway.create(), "Gateway");
-                // startHttpServer(gateway, context.getSystem());
             }
 
-            // Spawn worker actors (can be done by any node)
-            // spawnWorkerActors(context, sharding, scheduler);
-
             return Behaviors.empty();
+
         }), "ClusterSystem", config);
 
         askTimeout = Duration.ofSeconds(30);
         scheduler = system.scheduler();
         httpClient = HttpClient.newHttpClient();
+        
     }
 
         private static List<Product.InitializeProduct> loadProductsFromExcel(String fileName) {
@@ -140,52 +117,66 @@ public class DemoMarketplaceServiceApplication {
     }
 
     private static void startHttpServer(ActorRef<Gateway.Command> gateway, ActorSystem<?> system) throws IOException {
+
         HttpServer server = HttpServer.create(new InetSocketAddress(8081), 1000);
         server.createContext("/", new HttpHandlerImpl(gateway));
         ThreadPoolExecutor threadPoolExecutor = new ThreadPoolExecutor(
             8, 16, 30L, TimeUnit.SECONDS, new LinkedBlockingQueue<>(1000)
         );
+
         server.setExecutor(threadPoolExecutor);
         server.start();
         System.out.println(">>> HTTP server started on port 8081 <<<");
     }
 
-        // private static void spawnWorkerActors(akka.actor.typed.javadsl.ActorContext<Void> context, ClusterSharding sharding, Scheduler scheduler) {
-        //     for (int i = 0; i < 50; i++) {
-        //         // Replace with appropriate arguments for PostOrder
-        //         context.spawn(PostOrder.create("{}", null, sharding, i, new ArrayList<>(), scheduler), "PostOrder-" + i);
-
-        //         // Replace with appropriate arguments for DeleteOrder
-        //         context.spawn(DeleteOrder.create(i, null, sharding), "DeleteOrder-" + i);
-        //     }
-        // }
-
         private static void spawnWorkerActors(akka.actor.typed.javadsl.ActorContext<Void> context, ClusterSharding sharding, Scheduler scheduler) 
-        throws IOException {
-            // Create PostOrder workers
-            for (int i = 0; i < 50; i++) {
-                context.spawn(PostOrder.create("{}", null, sharding, i, new ArrayList<>(), scheduler), "PostOrder-" + i);
+        throws Exception {
+
+            // Create DeleteOrder workers and register them with the receptionist
+            for (int i = 0; i < 1000; i++) {
+                ActorRef<DeleteOrder.Command> worker = context.spawn(
+                    DeleteOrder.create(i, null, sharding),
+                    "DeleteOrder-" + i
+                );
+                // Register each DeleteOrder worker with the receptionist
+                context.getSystem().receptionist().tell(Receptionist.register(DeleteOrder.SERVICE_KEY, worker));
             }
-        
-            // Register PostOrder GroupRouter
-            ActorRef<PostOrder.Command> postOrderRouter = context.spawn(
-                Routers.group(PostOrder.SERVICE_KEY).withRoundRobinRouting(),
-                "PostOrderRouter"
-            );
-        
-            // Create DeleteOrder workers
-            for (int i = 0; i < 50; i++) {
-                context.spawn(DeleteOrder.create(i, null, sharding), "DeleteOrder-" + i);
-            }
-        
+
+            Thread.sleep(2000);
+
             // Register DeleteOrder GroupRouter
-            ActorRef<DeleteOrder.Command> deleteOrderRouter = context.spawn(
+            deleteOrderRouter = context.spawn(
                 Routers.group(DeleteOrder.SERVICE_KEY).withRoundRobinRouting(),
                 "DeleteOrderRouter"
             );
-        
+
+            Thread.sleep(2000);
+
+            // Create PostOrder workers and register them with the receptionist
+            for (int i = 0; i < 1000; i++) {
+                ActorRef<PostOrder.Command> worker = context.spawn(
+                    PostOrder.create("{}", null, sharding, i, new ArrayList<>(), scheduler),
+                    "PostOrder-" + i
+                );
+                // Register each PostOrder worker with the receptionist
+                context.getSystem().receptionist().tell(Receptionist.register(PostOrder.SERVICE_KEY, worker));
+            }
+            Thread.sleep(2000);
+            // Register PostOrder GroupRouter
+            postOrderRouter = context.spawn(
+                Routers.group(PostOrder.SERVICE_KEY).withRoundRobinRouting(),
+                "PostOrderRouter"
+            );
+
+            Thread.sleep(2000);
+
             // Pass the routers to the Gateway actor
-            ActorRef<Gateway.Command> gateway = context.spawn(Gateway.create(postOrderRouter, deleteOrderRouter, sharding), "Gateway");
+            gateway = context.spawn(
+                Gateway.create(postOrderRouter, deleteOrderRouter, sharding),
+                "Gateway"
+            );
+
+            Thread.sleep(2000);
             startHttpServer(gateway, context.getSystem());
         }
 
@@ -272,10 +263,10 @@ public class DemoMarketplaceServiceApplication {
             } else if (parts.length == 3 && method.equalsIgnoreCase("DELETE")) {
                 int orderId = Integer.parseInt(parts[2]);
                 AskPattern.ask(gateway,
-                    (ActorRef<Gateway.GeneralResponse> replyTo) -> new Gateway.DeleteOrderRequest(orderId, replyTo),
+                    (ActorRef<Gateway.OrderInfo> replyTo) -> new Gateway.DeleteOrderRequest(orderId, replyTo),
                     askTimeout, scheduler)
                 .thenAccept(resp -> {
-                    if (!resp.success)
+                    if (!resp.status.equals("CANCELLED"))
                         sendResponse(exchange, 400, "Order cancellation failed");
                     else
                         sendResponse(exchange, 200, resp.toJson());
@@ -288,9 +279,9 @@ public class DemoMarketplaceServiceApplication {
         private void handleMarketplaceRequests(HttpExchange exchange, String method) throws IOException {
             if (method.equalsIgnoreCase("DELETE")) {
                 AskPattern.ask(gateway,
-                    (ActorRef<Gateway.GeneralResponse> replyTo) -> new Gateway.GlobalReset(replyTo),
+                    (ActorRef<Gateway.OrderInfo> replyTo) -> new Gateway.GlobalReset(replyTo),
                     askTimeout, scheduler)
-                .thenAccept(resp -> sendResponse(exchange, 200, resp.message));
+                .thenAccept(resp -> sendResponse(exchange, 200, resp.toJson()));
             } else {
                 sendResponse(exchange, 404, "Not Found");
             }

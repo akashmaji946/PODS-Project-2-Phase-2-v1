@@ -21,11 +21,36 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty; 
 
 public class PostOrder extends AbstractBehavior<PostOrder.Command> {
+
     public static final EntityTypeKey<Command> ENTITY_TYPE_KEY = EntityTypeKey.create(Command.class, "PostOrder");
     public static final ServiceKey<Command> SERVICE_KEY = ServiceKey.create(Command.class, "PostOrderService");
     
     public interface Command {}
-    public static final class Initialize implements Command {}
+
+    public static final class Initialize implements Command {
+        private  String orderData;
+        private  ActorRef<Gateway.OrderInfo> replyTo;
+        private  ClusterSharding sharding;
+        private  int orderId;
+        private  List<Integer> userIdList;
+        private  Scheduler scheduler;
+
+        public Initialize(String orderData,
+                           ActorRef<Gateway.OrderInfo> replyTo,
+                           ClusterSharding sharding,
+                           int orderId,
+                           List<Integer> userIdList,
+                           Scheduler scheduler) {
+            this.orderData = orderData;
+            this.replyTo = replyTo;
+            this.sharding = sharding;
+            this.orderId = orderId;
+            this.userIdList = userIdList;
+            this.scheduler = scheduler;
+
+
+        }
+    }
 
     // Message to receive product details from Product actors.
     public static final class ProductDetailResponse implements Command {
@@ -45,13 +70,13 @@ public class PostOrder extends AbstractBehavior<PostOrder.Command> {
         }
     }
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
-    private final String orderData;
-    private final ActorRef<Gateway.OrderInfo> replyTo;
-    private final ClusterSharding sharding;
-    private final int orderId;
-    private final List<Integer> userIdList;
-    private final Scheduler scheduler;
+    private  ObjectMapper objectMapper = new ObjectMapper();
+    private  String orderData;
+    private  ActorRef<Gateway.OrderInfo> replyTo;
+    private  ClusterSharding sharding;
+    private  int orderId;
+    private  List<Integer> userIdList;
+    private  Scheduler scheduler;
 
     // Parsed order details.
     private int userId;
@@ -86,7 +111,7 @@ public class PostOrder extends AbstractBehavior<PostOrder.Command> {
 
         // Only send Initialize if replyTo is not null
         if (replyTo != null) {
-        getContext().getSelf().tell(new Initialize());
+            getContext().getSelf().tell(new Initialize(orderData, replyTo, sharding, orderId, userIdList, scheduler));
         }
     }
 
@@ -101,6 +126,12 @@ public class PostOrder extends AbstractBehavior<PostOrder.Command> {
 
     // --- Phase 1: Parse order data and collect product details ---
     private Behavior<Command> onInitialize(Initialize msg) {
+        this.orderData = msg.orderData;
+        this.replyTo = msg.replyTo;
+        this.sharding = msg.sharding;
+        this.orderId = msg.orderId;
+        this.userIdList = msg.userIdList;
+        this.scheduler = msg.scheduler;
         try {
             getContext().getLog().info("Received order data: {}", orderData);
     
@@ -112,6 +143,10 @@ public class PostOrder extends AbstractBehavior<PostOrder.Command> {
                 return Behaviors.stopped();
             }
             userId = (Integer) orderRequest.get("user_id");
+            if (getUser(userId) == 404) {
+                replyTo.tell(new Gateway.OrderInfo(orderId, 0, 0, "user actor missing for id " + userId, new ArrayList<>()));
+                return Behaviors.stopped();
+            }
     
             // Validate items
             if (!orderRequest.containsKey("items") || !(orderRequest.get("items") instanceof List)) {
@@ -127,7 +162,13 @@ public class PostOrder extends AbstractBehavior<PostOrder.Command> {
                 ActorRef<Gateway.ProductInfo> adapter = getContext().messageAdapter(Gateway.ProductInfo.class,
                         info -> new ProductDetailResponse(info));
                 EntityRef<Product.Command> productRef = sharding.entityRefFor(Product.ENTITY_TYPE_KEY, String.valueOf(prodId));
-                productRef.tell(new Product.GetProductInfo(prodId, adapter));
+                if(productRef != null) {
+                    productRef.tell(new Product.GetProductInfo(prodId, adapter));
+                } else {
+    
+                    replyTo.tell(new Gateway.OrderInfo(orderId, 0, 0, "Product not found: " + prodId, convertItemsToOrderItemInfo(items)));
+                    return Behaviors.stopped();
+                }
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -149,46 +190,6 @@ public class PostOrder extends AbstractBehavior<PostOrder.Command> {
             .onMessage(ProductDetailResponse.class, this::onProductDetailResponse)
             .build();
     }
-
-    // private Behavior<Command> onProductDetailResponse(ProductDetailResponse msg) {
-    //     Gateway.ProductInfo info = msg.productInfo;
-    //     collectedProductInfos.put(info.productId, info);
-    //     pendingProductResponses--;
-    //     if (pendingProductResponses == 0) {
-    //         // All product details received; now compute total cost.
-    //         totalCost = 0;
-    //         for (Map<String, Object> item : items) {
-    //             int prodId = (Integer) item.get("product_id");
-    //             int quantity = (Integer) item.get("quantity");
-    //             Gateway.ProductInfo pi = collectedProductInfos.get(prodId);
-    //             if (pi == null || pi.stock_quantity < quantity) {
-    //                 replyTo.tell(new Gateway.OrderInfo(orderId, 0, 0, "Insufficient stock for product " + prodId, new ArrayList<>()));
-    //                 return Behaviors.stopped();
-    //             }
-    //             totalCost += quantity * pi.price;
-    //         }
-    //         // Query Account Service for discount detail (simulate with isFirstOrder check)
-    //         boolean discountApplicable = !userIdList.contains(userId);
-    //         finalCost = discountApplicable ? (int)(totalCost * 0.9) : totalCost;
-    //         // Debit wallet.
-    //         if (!debitWallet(userId, finalCost)) {
-    //             replyTo.tell(new Gateway.OrderInfo(orderId, 0, 0, "Insufficient wallet balance", new ArrayList<>()));
-    //             return Behaviors.stopped();
-    //         }
-    //         // Move to Phase 2: Reduce stock.
-    //         pendingStockReductionResponses = items.size();
-    //         for (Map<String, Object> item : items) {
-    //             int prodId = (Integer) item.get("product_id");
-    //             int quantity = (Integer) item.get("quantity");
-    //             ActorRef<Product.OperationResponse> adapter = getContext().messageAdapter(Product.OperationResponse.class,
-    //                     op -> new StockReductionResponse(prodId, op));
-    //             EntityRef<Product.Command> productRef = sharding.entityRefFor(Product.ENTITY_TYPE_KEY, String.valueOf(prodId));
-    //             productRef.tell(new Product.ReduceStock(quantity, adapter));
-    //         }
-    //         return waitingForStockReduction();
-    //     }
-    //     return this;
-    // }
 
     private Behavior<Command> onProductDetailResponse(ProductDetailResponse msg) {
         Gateway.ProductInfo info = msg.productInfo;
@@ -278,13 +279,19 @@ public class PostOrder extends AbstractBehavior<PostOrder.Command> {
                         orderItems.add(new Order.OrderItem(orderItemIdCounter++, prodId, quantity));
                     }
 
+                    // Convert Order.OrderItem list into Order.OrderItemInfo list.
+                    List<Order.OrderItemInfo> orderItemInfos = orderItems.stream()
+                            .map(oi -> new Order.OrderItemInfo(oi.id, oi.product_id, oi.quantity))
+                            .collect(Collectors.toList());
+
                     EntityRef<Order.Command> orderRef = sharding.entityRefFor(Order.ENTITY_TYPE_KEY, String.valueOf(orderId));
 
 
                     orderRef.tell(new Order.PlaceOrder(orderId, userId, finalCost, orderItems));
 
-                    replyTo.tell(new Gateway.OrderInfo(orderId, userId, finalCost, "PLACED", convertItemsToOrderItemInfo(items)));
-                    
+                    // replyTo.tell(new Gateway.OrderInfo(orderId, userId, finalCost, "PLACED", convertItemsToOrderItemInfo(items)));
+                    replyTo.tell(new Gateway.OrderInfo(orderId, userId, finalCost, "PLACED", orderItemInfos));
+
                     // note here
                     return Behaviors.empty();
 

@@ -63,8 +63,8 @@ def populate_products():
 
 def main():
     try:
-        user_id = 1212
-        resp = post_user(user_id, "PODS1 User", "pods1@csa.in")
+        user_id = 1219
+        resp = post_user(user_id, "PODS User", "pods@csa.in")
         if not check_response_status_code(resp, 201):
             return False
 

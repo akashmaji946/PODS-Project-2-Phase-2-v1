@@ -10,11 +10,11 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class Gateway extends AbstractBehavior<Gateway.Command> {
-    private final ClusterSharding sharding;
-    private final ActorRef<PostOrder.Command> postOrderRouter;
-    private final ActorRef<DeleteOrder.Command> deleteOrderRouter;
-    private final Map<Integer, ActorRef<Order.Command>> orderActors = new ConcurrentHashMap<>();
-    private final List<Integer> userIdList = new ArrayList<>();
+    private  ClusterSharding sharding;
+    private  ActorRef<PostOrder.Command> postOrderRouter;
+    private  ActorRef<DeleteOrder.Command> deleteOrderRouter;
+    private  Map<Integer, ActorRef<Order.Command>> orderActors = new ConcurrentHashMap<>();
+    private  List<Integer> userIdList = new ArrayList<>();
     private int orderIdCounter = 1; // Simple order ID generator.
 
     // Constructor
@@ -61,16 +61,18 @@ public class Gateway extends AbstractBehavior<Gateway.Command> {
 
     private Behavior<Command> onCreateOrder(CreateOrder msg) {
         String uniqueName = "PostOrder-" + java.util.UUID.randomUUID().toString();
-        getContext().spawn(PostOrder.create(msg.orderData, msg.replyTo, sharding, orderIdCounter, userIdList, getContext().getSystem().scheduler()), uniqueName);
+        // getContext().spawn(PostOrder.create(msg.orderData, msg.replyTo, sharding, orderIdCounter, userIdList, getContext().getSystem().scheduler()), uniqueName);
+        postOrderRouter.tell(new PostOrder.Initialize(msg.orderData, msg.replyTo, sharding, orderIdCounter, userIdList, null));
         orderIdCounter++;
         return this;
     }
 
     // GET /orders/{orderId}
     private Behavior<Command> onGetOrder(GetOrder msg) {
-        ActorRef<Order.Command> orderActor = orderActors.get(msg.orderId);
-        if (orderActor != null) {
-            orderActor.tell(new Order.GetOrder(msg.orderId, msg.replyTo));
+        EntityRef<Order.Command> orderRef = sharding.entityRefFor(Order.ENTITY_TYPE_KEY, String.valueOf(msg.orderId));
+        // ActorRef<Order.Command> orderActor = orderActors.get(msg.orderId);
+        if (orderRef != null) {
+            orderRef.tell(new Order.GetOrder(msg.orderId, msg.replyTo));
         } else {
             msg.replyTo.tell(new Gateway.OrderInfo(-1, -1, 0, "", new ArrayList<>()));
         }
@@ -79,9 +81,10 @@ public class Gateway extends AbstractBehavior<Gateway.Command> {
 
     // PUT /orders/{orderId} – update order (e.g. mark delivered).
     private Behavior<Command> onUpdateOrder(UpdateOrder msg) {
-        ActorRef<Order.Command> orderActor = orderActors.get(msg.orderId);
-        if (orderActor != null) {
-            orderActor.tell(new Order.UpdateOrder(msg.orderId, msg.updateData, msg.replyTo));
+        // ActorRef<Order.Command> orderActor = orderActors.get(msg.orderId);
+        EntityRef<Order.Command> orderRef = sharding.entityRefFor(Order.ENTITY_TYPE_KEY, String.valueOf(msg.orderId));
+        if (orderRef != null) {
+            orderRef.tell(new Order.UpdateOrder(msg.orderId, msg.updateData, msg.replyTo));
         } else {
             msg.replyTo.tell(new Gateway.OrderInfo(-1, -1, 0, "", new ArrayList<>()));
         }
@@ -91,8 +94,10 @@ public class Gateway extends AbstractBehavior<Gateway.Command> {
     // DELETE /orders/{orderId} – cancel order by spawning a DeleteOrder worker.
     // DELETE /orders/{orderId} – cancel order by spawning a DeleteOrder worker.
     private Behavior<Command> onDeleteOrder(DeleteOrderRequest msg) {
+        deleteOrderRouter.tell(new DeleteOrder.InitiateCancellation(msg.orderId, msg.replyTo, sharding));
+        System.out.println("-----------------------DeleteOrderRequest: " + msg.orderId);
         String uniqueName = "DeleteOrder-" + java.util.UUID.randomUUID().toString();
-        getContext().spawn(DeleteOrder.create(msg.orderId, msg.replyTo, sharding), uniqueName);
+        // getContext().spawn(DeleteOrder.create(msg.orderId, msg.replyTo, sharding), uniqueName);
         return this;
     }
 
@@ -103,7 +108,7 @@ public class Gateway extends AbstractBehavior<Gateway.Command> {
                 String uniqueName = "DeleteOrder-" + java.util.UUID.randomUUID().toString();
                 getContext().spawn(DeleteOrder.create(orderId, msg.replyTo, sharding), uniqueName);
             }
-            msg.replyTo.tell(new GeneralResponse(true, "Global reset: Cancelled all orders"));
+            msg.replyTo.tell(new OrderInfo(-1, -1, 0, "CANCELLED ALL", new ArrayList<>()));
             return this;
         }
 
@@ -144,16 +149,16 @@ public class Gateway extends AbstractBehavior<Gateway.Command> {
 
     public static class DeleteOrderRequest implements Command {
         public final int orderId;
-        public final ActorRef<GeneralResponse> replyTo;
-        public DeleteOrderRequest(int orderId, ActorRef<GeneralResponse> replyTo) {
+        public final ActorRef<OrderInfo> replyTo;
+        public DeleteOrderRequest(int orderId, ActorRef<OrderInfo> replyTo) {
             this.orderId = orderId;
             this.replyTo = replyTo;
         }
     }
 
     public static class GlobalReset implements Command {
-        public final ActorRef<GeneralResponse> replyTo;
-        public GlobalReset(ActorRef<GeneralResponse> replyTo) { this.replyTo = replyTo; }
+        public final ActorRef<OrderInfo> replyTo;
+        public GlobalReset(ActorRef<OrderInfo> replyTo) { this.replyTo = replyTo; }
     }
 
     // ----- Response message types -----
@@ -203,6 +208,7 @@ public class Gateway extends AbstractBehavior<Gateway.Command> {
             this.status = status;
             this.items = items;
         }
+
         public String toJson() {
             StringBuilder itemsJson = new StringBuilder("[");
             for (Order.OrderItemInfo item : items) {

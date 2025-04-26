@@ -11,8 +11,10 @@ import akka.cluster.sharding.typed.javadsl.EntityRef;
 
 public class Product extends AbstractBehavior<Product.Command> {
 
+    // Key Definitions
     public static final EntityTypeKey<Command> ENTITY_TYPE_KEY = EntityTypeKey.create(Command.class, "Product");
 
+    // Fields
     private final ClusterSharding sharding;
     private int id;
     private String name;
@@ -20,10 +22,12 @@ public class Product extends AbstractBehavior<Product.Command> {
     private int price;
     private int stock_quantity;
 
+    // Create Method
     public static Behavior<Command> create(ClusterSharding sharding) {
         return Behaviors.setup(context -> new Product(context, sharding, 0, "Default", "Default Description", 0, 0));
     }
 
+    // Constructor
     private Product(ActorContext<Command> context, ClusterSharding sharding, int id, String name, String description, int price, int stock_quantity) {
         super(context);
         this.sharding = sharding;
@@ -34,6 +38,7 @@ public class Product extends AbstractBehavior<Product.Command> {
         this.stock_quantity = stock_quantity;
     }
 
+    // On Receive
     @Override
     public Receive<Command> createReceive() {
         return newReceiveBuilder()
@@ -45,47 +50,7 @@ public class Product extends AbstractBehavior<Product.Command> {
             .build();
     }
 
-    private Behavior<Command> onInitializeProduct(InitializeProduct msg) {
-        this.id = msg.id;
-        this.name = msg.name;
-        this.description = msg.description;
-        this.price = msg.price;
-        this.stock_quantity = msg.stockQuantity;
-        getContext().getLog().info("Product {} initialized: {}", id, name);
-        return this;
-    }
-
-    private Behavior<Command> onGetProduct(GetProduct msg) {
-        EntityRef<Product.Command> productRef = sharding.entityRefFor(Product.ENTITY_TYPE_KEY, String.valueOf(msg.productId));
-
-        // Send an initialization message if this is the first time the product is accessed.
-        productRef.tell(new Product.InitializeProduct(msg.productId, "Product " + msg.productId, "Description for product " + msg.productId, 100, 50));
-
-        productRef.tell(new Product.GetProductInfo(msg.productId, msg.replyTo));
-        return this;
-    }
-
-    private Behavior<Command> onGetProductInfo(GetProductInfo msg) {
-        msg.replyTo.tell(new Gateway.ProductInfo(id, name, description, price, stock_quantity));
-        return this;
-    }
-
-    private Behavior<Command> onReduceStock(ReduceStock msg) {
-        if (stock_quantity >= msg.quantity) {
-            stock_quantity -= msg.quantity;
-            msg.replyTo.tell(new OperationResponse(true, "Stock reduced", stock_quantity));
-        } else {
-            msg.replyTo.tell(new OperationResponse(false, "Insufficient stock", stock_quantity));
-        }
-        return this;
-    }
-
-    private Behavior<Command> onRestoreStock(RestoreStock msg) {
-        stock_quantity += msg.quantity;
-        msg.replyTo.tell(new OperationResponse(true, "Stock restored", stock_quantity));
-        return this;
-    }
-
+    // Message Definitions
     public interface Command {}
 
     public static class InitializeProduct implements Command {
@@ -183,4 +148,47 @@ public class Product extends AbstractBehavior<Product.Command> {
             this.currentStock = currentStock;
         }
     }
+
+    // On Handlers
+    private Behavior<Command> onInitializeProduct(InitializeProduct msg) {
+        this.id = msg.id;
+        this.name = msg.name;
+        this.description = msg.description;
+        this.price = msg.price;
+        this.stock_quantity = msg.stockQuantity;
+        getContext().getLog().info("Product {} initialized: {}", id, name);
+        return this;
+    }
+
+    private Behavior<Command> onGetProduct(GetProduct msg) {
+        EntityRef<Product.Command> productRef = sharding.entityRefFor(Product.ENTITY_TYPE_KEY, String.valueOf(msg.productId));
+
+        // Send an initialization message if this is the first time the product is accessed.
+        productRef.tell(new Product.InitializeProduct(msg.productId, "Product " + msg.productId, "Description for product " + msg.productId, 100, 50));
+
+        productRef.tell(new Product.GetProductInfo(msg.productId, msg.replyTo));
+        return this;
+    }
+
+    private Behavior<Command> onGetProductInfo(GetProductInfo msg) {
+        msg.replyTo.tell(new Gateway.ProductInfo(id, name, description, price, stock_quantity));
+        return this;
+    }
+
+    private Behavior<Command> onReduceStock(ReduceStock msg) {
+        if (stock_quantity >= msg.quantity) {
+            stock_quantity -= msg.quantity;
+            msg.replyTo.tell(new OperationResponse(true, "Stock reduced", stock_quantity));
+        } else {
+            msg.replyTo.tell(new OperationResponse(false, "Insufficient stock", stock_quantity));
+        }
+        return this;
+    }
+
+    private Behavior<Command> onRestoreStock(RestoreStock msg) {
+        stock_quantity += msg.quantity;
+        msg.replyTo.tell(new OperationResponse(true, "Stock restored", stock_quantity));
+        return this;
+    }
 }
+
