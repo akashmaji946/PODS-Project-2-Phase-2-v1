@@ -264,29 +264,67 @@ public class PostOrder extends AbstractBehavior<PostOrder.Command> {
             boolean allSuccess = stockReductionResults.values().stream().allMatch(s -> s);
             if (allSuccess) {
 
-                updateUserDiscount(userId, false);
+                try{
 
-                // All stock reductions succeeded.
-                List<Order.OrderItem> orderItems = new ArrayList<>();
-                for (Map<String, Object> item : items) {
-                    int prodId = (Integer) item.get("product_id");
-                    int quantity = (Integer) item.get("quantity");
-                    orderItems.add(new Order.OrderItem(orderId, prodId, quantity));
+                    updateUserDiscount(userId, false);
+
+                    int orderItemIdCounter = 1;
+                    // All stock reductions succeeded.
+                    List<Order.OrderItem> orderItems = new ArrayList<>();
+
+                    for (Map<String, Object> item : items) {
+                        int prodId = (Integer) item.get("product_id");
+                        int quantity = (Integer) item.get("quantity");
+                        orderItems.add(new Order.OrderItem(orderItemIdCounter++, prodId, quantity));
+                    }
+
+                    EntityRef<Order.Command> orderRef = sharding.entityRefFor(Order.ENTITY_TYPE_KEY, String.valueOf(orderId));
+
+
+                    orderRef.tell(new Order.PlaceOrder(orderId, userId, finalCost, orderItems));
+
+                    replyTo.tell(new Gateway.OrderInfo(orderId, userId, finalCost, "PLACED", convertItemsToOrderItemInfo(items)));
+                    
+                    // note here
+                    return Behaviors.empty();
+
+                }catch (Exception e){
+                    e.printStackTrace();
+
+                    refundWallet(userId, finalCost);
+                    
+                    for (Map<String, Object> item : items) {
+
+                        int prodId = (Integer) item.get("product_id");
+                        int quantity = (Integer) item.get("quantity");
+                        Boolean reduced = stockReductionResults.get(prodId);
+
+                        if(reduced != null && !reduced) {
+                            EntityRef<Product.Command> productRef = sharding.entityRefFor(Product.ENTITY_TYPE_KEY, String.valueOf(prodId));
+                            productRef.tell(new Product.RestoreStock(quantity,
+                                            getContext().messageAdapter(Product.OperationResponse.class, 
+                                                    op -> new StockReductionResponse(prodId, op))));
+                        }
+                    }
+                    replyTo.tell(new Gateway.OrderInfo(orderId, 0, 0, "Stock reduction failed, order cancelled", new ArrayList<>()));
+                    return Behaviors.stopped();
                 }
-                EntityRef<Order.Command> orderRef = sharding.entityRefFor(Order.ENTITY_TYPE_KEY, String.valueOf(orderId));
-                orderRef.tell(new Order.PlaceOrder(orderId, userId, finalCost, orderItems));
-                replyTo.tell(new Gateway.OrderInfo(orderId, userId, finalCost, "PLACED", convertItemsToOrderItemInfo(items)));
-                return Behaviors.stopped();
+           
+           
             } else {
                 // At least one stock reduction failed; perform compensation.
                 refundWallet(userId, finalCost);
                 for (Map<String, Object> item : items) {
                     int prodId = (Integer) item.get("product_id");
                     int quantity = (Integer) item.get("quantity");
-                    EntityRef<Product.Command> productRef = sharding.entityRefFor(Product.ENTITY_TYPE_KEY, String.valueOf(prodId));
-                    productRef.tell(new Product.RestoreStock(quantity,
-                                    getContext().messageAdapter(Product.OperationResponse.class, 
-                                            op -> new StockReductionResponse(prodId, op))));
+                    Boolean reduced = stockReductionResults.get(prodId);
+
+                    if(reduced != null && !reduced) {
+                        EntityRef<Product.Command> productRef = sharding.entityRefFor(Product.ENTITY_TYPE_KEY, String.valueOf(prodId));
+                        productRef.tell(new Product.RestoreStock(quantity,
+                                        getContext().messageAdapter(Product.OperationResponse.class, 
+                                                op -> new StockReductionResponse(prodId, op))));
+                    }
                 }
                 replyTo.tell(new Gateway.OrderInfo(orderId, 0, 0, "Stock reduction failed, order cancelled", new ArrayList<>()));
                 return Behaviors.stopped();
