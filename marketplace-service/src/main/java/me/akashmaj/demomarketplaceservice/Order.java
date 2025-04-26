@@ -38,7 +38,7 @@ public class Order extends AbstractBehavior<Order.Command> {
         this.orderId = orderId;
         this.user_id = user_id;
         this.total_price = total_price;
-        this.status = "PLACED";
+        this.status = "";
         this.items = items;
         this.userIdList = userIdList;
         if (!this.userIdList.contains(user_id)) {

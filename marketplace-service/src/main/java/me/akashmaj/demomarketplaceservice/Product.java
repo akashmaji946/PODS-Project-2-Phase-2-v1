@@ -43,7 +43,6 @@ public class Product extends AbstractBehavior<Product.Command> {
     public Receive<Command> createReceive() {
         return newReceiveBuilder()
             .onMessage(InitializeProduct.class, this::onInitializeProduct)
-            .onMessage(GetProduct.class, this::onGetProduct)
             .onMessage(GetProductInfo.class, this::onGetProductInfo)
             .onMessage(ReduceStock.class, this::onReduceStock)
             .onMessage(RestoreStock.class, this::onRestoreStock)
@@ -157,16 +156,6 @@ public class Product extends AbstractBehavior<Product.Command> {
         this.price = msg.price;
         this.stock_quantity = msg.stockQuantity;
         getContext().getLog().info("Product {} initialized: {}", id, name);
-        return this;
-    }
-
-    private Behavior<Command> onGetProduct(GetProduct msg) {
-        EntityRef<Product.Command> productRef = sharding.entityRefFor(Product.ENTITY_TYPE_KEY, String.valueOf(msg.productId));
-
-        // Send an initialization message if this is the first time the product is accessed.
-        productRef.tell(new Product.InitializeProduct(msg.productId, "Product " + msg.productId, "Description for product " + msg.productId, 100, 50));
-
-        productRef.tell(new Product.GetProductInfo(msg.productId, msg.replyTo));
         return this;
     }
 

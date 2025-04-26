@@ -267,7 +267,7 @@ public class PostOrder extends AbstractBehavior<PostOrder.Command> {
 
                 try{
 
-                    updateUserDiscount(userId, false);
+                    updateUserDiscount(userId, true);
 
                     int orderItemIdCounter = 1;
                     // All stock reductions succeeded.
@@ -293,7 +293,7 @@ public class PostOrder extends AbstractBehavior<PostOrder.Command> {
                     replyTo.tell(new Gateway.OrderInfo(orderId, userId, finalCost, "PLACED", orderItemInfos));
 
                     // note here
-                    return Behaviors.empty();
+                    return Behaviors.stopped();
 
                 }catch (Exception e){
                     e.printStackTrace();
@@ -326,7 +326,7 @@ public class PostOrder extends AbstractBehavior<PostOrder.Command> {
                     int quantity = (Integer) item.get("quantity");
                     Boolean reduced = stockReductionResults.get(prodId);
 
-                    if(reduced != null && !reduced) {
+                    if(reduced != null && reduced) {
                         EntityRef<Product.Command> productRef = sharding.entityRefFor(Product.ENTITY_TYPE_KEY, String.valueOf(prodId));
                         productRef.tell(new Product.RestoreStock(quantity,
                                         getContext().messageAdapter(Product.OperationResponse.class, 
