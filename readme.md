@@ -15,6 +15,7 @@ These services are built with Spring Boot and Akka Cluster (for marketplace serv
 ```bash
 cd account-service
 mvn clean package
+# Start the user node
 java -jar target/account-service-0.0.1-SNAPSHOT.jar
 ```
 
@@ -22,10 +23,8 @@ java -jar target/account-service-0.0.1-SNAPSHOT.jar
 ```bash
 cd marketplace-service
 mvn clean package
-
 # Start the primary marketplace node
 java -Dexec.args=8083 -jar target/marketplace-service-0.0.1-SNAPSHOT.jar
-
 # Start an additional marketplace node
 java -Dexec.args=8084 -jar target/marketplace-service-0.0.1-SNAPSHOT.jar
 ```
@@ -34,52 +33,14 @@ java -Dexec.args=8084 -jar target/marketplace-service-0.0.1-SNAPSHOT.jar
 ```bash
 cd wallet-service
 mvn clean package
+# Start the wallet node
 java -jar target/wallet-service-0.0.1-SNAPSHOT.jar
 ```
 
 ---
 
 ## 🐳 Docker Instructions
-
-> **⚠️ Note:** Docker steps are provided for reference only.  
-> **Do not run Docker steps now without changing code (localhost -> host.docker.internal) if running locally.**
-
-### Build Docker Images
-```bash
-docker build -t account-service ./account-service
-docker build -t marketplace-service ./marketplace-service
-docker build -t wallet-service ./wallet-service
-```
-
-### Deploy Containers
-```bash
-docker run -p 8080:8080 --rm --name account \
-           --add-host=host.docker.internal:host-gateway \
-           account-service &
-
-docker run -p 8081:8080 --rm --name marketplace \
-           --add-host=host.docker.internal:host-gateway \
-           marketplace-service &
-
-docker run -p 8082:8080 --rm --name wallet \
-           --add-host=host.docker.internal:host-gateway \
-           wallet-service &
-```
-
-### Stop Running Containers
-```bash
-docker stop account marketplace wallet
-```
-
-### Remove Containers
-```bash
-docker rm account marketplace wallet
-```
-
-### Clean Up Docker Images
-```bash
-docker rmi account-service marketplace-service wallet-service
-```
+Refer `docker` branch
 
 ---
 
