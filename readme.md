@@ -44,7 +44,7 @@ Run the marketplace with replicas
 docker run --net=host --rm --name marketplace \
            marketplace-service -Dexec.args=8083
 
-docker run --net=host --rm --name marketplace-2 \
+docker run --net=host --rm --name marketplace-1 \
            marketplace-service -Dexec.args=8084
 
 docker run --net=host --rm --name marketplace-2 \
@@ -54,7 +54,7 @@ docker run --net=host --rm --name marketplace-2 \
 
 ### Stop Running Containers
 ```bash
-docker stop account marketplace wallet
+docker stop account wallet marketplace marketplace-1 marketplace-2
 ```
 
 ### Remove Containers
