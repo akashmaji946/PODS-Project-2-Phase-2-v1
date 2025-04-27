@@ -1,53 +1,57 @@
-### RUN THIS FOR LOCALHOST
 
-inside account-service
-________________________
-mvn clean package
-java -jar target/account-service-0.0.1-SNAPSHOT.jar
-
-
-inside marketplace-service
-__________________________
-mvn clean package
-java -Dexec.args=8083 -jar target/marketplace-service-0.0.1-SNAPSHOT.jar
-java -Dexec.args=8084 -jar target/marketplace-service-0.0.1-SNAPSHOT.jar
-
-inside wallet-service
-_____________________
-mvn clean package
-java -jar target/wallet-service-0.0.1-SNAPSHOT.jar
-
-
-
-################################################################################
-
+###################### DOCKER STEPS  ###############################
+--------------------------------------------------------------------
 # build
+--------------------------------------------------------------------
 docker build -t account-service .
 docker build -t marketplace-service .
 docker build -t wallet-service .
 
 
+--------------------------------------------------------------------
 # deploy
+--------------------------------------------------------------------
 docker run -p 8080:8080 --rm --name account \
-                        --add-host=host.docker.internal:host-gateway \
-                        account-service &
-
-docker run -p 8081:8080 --rm --name marketplace \
-                        --add-host=host.docker.internal:host-gateway \
-                        marketplace-service &
+           --add-host=host.docker.internal:host-gateway \
+           account-service
 
 docker run -p 8082:8080 --rm --name wallet \
-                        --add-host=host.docker.internal:host-gateway \
-                        wallet-service &
+           --add-host=host.docker.internal:host-gateway \
+           wallet-service
 
+--------------------------------------------------------------------
+docker run --net=host --rm --name marketplace \
+           marketplace-service -Dexec.args=8083
+
+docker run --net=host --rm --name marketplace-1 \
+           marketplace-service -Dexec.args=8084
+
+docker run --net=host --rm --name marketplace-2 \
+           marketplace-service -Dexec.args=8085
+
+
+--------------------------------------------------------------------
 # stop
+--------------------------------------------------------------------
 docker stop account marketplace wallet
 
+
+--------------------------------------------------------------------
 # remove
+--------------------------------------------------------------------
 docker rm account marketplace wallet
 
+
+--------------------------------------------------------------------
 # clean
+--------------------------------------------------------------------
 docker rmi account-service marketplace-service wallet-service
 
+
+
+--------------------------------|
+@author: Akash Maji             |
+@email: akashmaji@iisc.ac.in    |
+--------------------------------|
 
 
