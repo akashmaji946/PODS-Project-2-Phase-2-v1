@@ -1,6 +1,5 @@
-# Marketplace Microservices
+# Marketplace Microservice
 
-##### Akash Maji [akashmaji@iisc.ac.in] 
 This project includes three microservices:
 - **Account Service** (`account-service`)
 - **Marketplace Service** (`marketplace-service`)
@@ -60,7 +59,7 @@ docker stop account wallet marketplace marketplace-1 marketplace-2
 
 ### Remove Containers
 ```bash
-docker rm account marketplace wallet
+docker rm account wallet marketplace marketplace-1 marketplace-2
 ```
 
 ### Clean Up Docker Images
@@ -72,9 +71,14 @@ docker rmi account-service marketplace-service wallet-service
 
 ## 📚 Notes
 - Marketplace service uses **Akka Cluster Sharding** internally.
-- Running two instances of marketplace service (ports 8083 and 8084) enables **cluster node communication**.
+- Running two instances of marketplace service (ports 8083 and 8084, and possible more) enables **cluster node communication**.
 - The HTTP server inside marketplace-service listens on port **8081** (for client requests).
 - Use provided `products.xlsx` file to initialize products (required inside marketplace-service resources).
 
-#### Thank You
+## Access them at:
+- https://localhost:8080 [account-service]
+- https://localhost:8081 [marketplace-service]
+- https://localhost:8082 [wallet-service]
 
+### Thank You
+#### Akash Maji [akashmaji@iisc.ac.in] 
