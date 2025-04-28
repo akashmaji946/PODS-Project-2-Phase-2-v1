@@ -104,14 +104,14 @@ def main():
             total_needed += compute_pair_cost(p1, p2, product_info)
 
         # 3. Create two users
-        user1_id = 300001
-        user2_id = 300002
+        user1_id = 3000011
+        user2_id = 3000021
 
-        resp1 = post_user(user1_id, "UserThree001", "u300001@example.com")
+        resp1 = post_user(user1_id, "User1Three001", "u1300001@example.com")
         if not check_response_status_code(resp1, 201):
             return False
 
-        resp2 = post_user(user2_id, "UserThree002", "u300002@example.com")
+        resp2 = post_user(user2_id, "Userp1Three002", "u1p300002@example.com")
         if not check_response_status_code(resp2, 201):
             return False
 
@@ -152,6 +152,10 @@ def main():
             resp_u1 = user1_thread.responses[i]
             resp_u2 = user2_thread.responses[i]
 
+            print(resp_u1.json())
+            print(resp_u1.json())
+            print("----")
+
             success_u1 = (resp_u1.status_code == 201)
             success_u2 = (resp_u2.status_code == 201)
 
@@ -163,11 +167,11 @@ def main():
             if success_u1:
                 # Add the cost of that pair
                 p1, p2 = PRODUCT_PAIRS[i]
-                user1_total_spent += compute_pair_cost(p1, p2, product_info)
+                user1_total_spent += resp_u1.json()["total_price"]
 
             if success_u2:
                 p1, p2 = PRODUCT_PAIRS[i]
-                user2_total_spent += compute_pair_cost(p1, p2, product_info)
+                user2_total_spent += resp_u1.json()["total_price"]
 
         # 9. Check each user's final wallet balance
         w1_resp = get_wallet(user1_id)
