@@ -128,13 +128,18 @@ def main():
         user1_thread = UserOrderThread(user1_id, product_info, thread_name="User1Thread")
         user2_thread = UserOrderThread(user2_id, product_info, thread_name="User2Thread")
 
+        print("FIRST")
         # 6. Start them
         user1_thread.start()
+        import time
+        time.sleep(1)
         user2_thread.start()
 
         # 7. Wait for them to finish
         user1_thread.join()
         user2_thread.join()
+
+        print("SECOND")
 
         # 8. Analyze the results
         #    We have 10 responses from each user. For i in [0..9],
