@@ -33,7 +33,7 @@ docker run --net=host --rm --name marketplace-2 \
 --------------------------------------------------------------------
 # stop
 --------------------------------------------------------------------
-docker stop account marketplace wallet
+docker stop account marketplace  marketplace-1 marketplace-2 wallet
 
 
 --------------------------------------------------------------------
