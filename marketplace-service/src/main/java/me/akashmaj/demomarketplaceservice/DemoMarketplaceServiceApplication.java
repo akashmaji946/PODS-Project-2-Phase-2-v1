@@ -272,7 +272,22 @@ public class DemoMarketplaceServiceApplication {
                     else
                         sendResponse(exchange, 200, resp.toJson());
                 });
-            } else {
+            } else if (parts.length == 3 && method.equalsIgnoreCase("PUT")) {
+                // PUT /orders/{orderId} (mark delivered)
+                int orderId = Integer.parseInt(parts[2]);
+                String body = new String(exchange.getRequestBody().readAllBytes());
+                AskPattern.ask(gateway,
+                    (ActorRef<Gateway.OrderInfo> replyTo) -> new Gateway.UpdateOrder(orderId, body, replyTo),
+                    askTimeout, scheduler)
+                .thenAccept(orderInfo -> {
+                    if (orderInfo.status != "DELIVERED")
+                        sendResponse(exchange, 400, "Order update failed");
+                    else
+                        sendResponse(exchange, 200, orderInfo.toJson());
+                });
+                
+            }
+            else {
                 sendResponse(exchange, 404, "Not Found");
             }
         }
