@@ -18,6 +18,11 @@ def main():
         resp = put_wallet(user_id, "credit", 100000)
         if not check_response_status_code(resp, 200):
             return False
+        
+        # failure:
+        quantity = 200
+        product_id = 102 
+        resp = post_order(user_id, [{"product_id": product_id, "quantity": quantity}])
 
         # Step 3: Get initial product info
         product_id = 102  # Example product ID
@@ -29,6 +34,7 @@ def main():
 
         # Step 4: Place an order
         quantity = 2
+        product_id = 102 
         resp = post_order(user_id, [{"product_id": product_id, "quantity": quantity}])
         if not check_response_status_code(resp, 201):
             return False
@@ -41,12 +47,19 @@ def main():
             return False
         print(f"Order {order_id} canceled successfully.")
 
+
+
+
         # Step 6: Place the same order again
+        quantity = 2
+        product_id = 102 
         resp = post_order(user_id, [{"product_id": product_id, "quantity": quantity}])
         if not check_response_status_code(resp, 201):
             return False
         new_order_id = resp.json().get("order_id")
         print(f"Same order placed again successfully. New Order ID: {new_order_id}")
+
+
 
         # Step 7: Get product info after placing the same order again
         resp = get_product(product_id)

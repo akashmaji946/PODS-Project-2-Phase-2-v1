@@ -304,6 +304,10 @@ public class PostOrder extends AbstractBehavior<PostOrder.Command> {
                     e.printStackTrace();
 
                     refundWallet(userId, finalCost);
+
+                    if(getUserDiscountAvailed(userId) == false){
+                        userIdList.remove(userId);
+                    }
                     
                     for (Map<String, Object> item : items) {
 
@@ -326,6 +330,9 @@ public class PostOrder extends AbstractBehavior<PostOrder.Command> {
             } else {
                 // At least one stock reduction failed; perform compensation.
                 refundWallet(userId, finalCost);
+                if(getUserDiscountAvailed(userId) == false){
+                    userIdList.remove(userId);
+                }
                 for (Map<String, Object> item : items) {
                     int prodId = (Integer) item.get("product_id");
                     int quantity = (Integer) item.get("quantity");
@@ -397,6 +404,25 @@ public class PostOrder extends AbstractBehavior<PostOrder.Command> {
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    public boolean getUserDiscountAvailed(int user_id) {
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(new URI("http://localhost:8080/users/" + user_id))
+                    .header("Content-Type", "application/json")
+                    .GET()
+                    .build();
+            HttpResponse<String> response = DemoMarketplaceServiceApplication.httpClient.send(request, BodyHandlers.ofString());
+            if (response.statusCode() == 200) {
+                Map<String, Object> user = objectMapper.readValue(response.body(), new TypeReference<Map<String, Object>>() {});
+                return (Boolean) user.get("discount_availed");
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    
+        return false;
     }
 
     private int getUser(int user_id) {

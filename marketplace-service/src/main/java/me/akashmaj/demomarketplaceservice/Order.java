@@ -41,9 +41,9 @@ public class Order extends AbstractBehavior<Order.Command> {
         this.status = "";
         this.items = items;
         this.userIdList = userIdList;
-        if (!this.userIdList.contains(user_id)) {
-            this.userIdList.add(user_id);
-        }
+        // if (!this.userIdList.contains(user_id)) {
+        //     this.userIdList.add(user_id);
+        // }
     }
 
     // On Receive
