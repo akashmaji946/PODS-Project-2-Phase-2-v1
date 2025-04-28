@@ -156,12 +156,12 @@ public class Product extends AbstractBehavior<Product.Command> {
         this.price = msg.price;
         this.stock_quantity = msg.stockQuantity;
         getContext().getLog().info("Product {} initialized: {}", id, name);
-        return this;
+        return Behaviors.same();
     }
 
     private Behavior<Command> onGetProductInfo(GetProductInfo msg) {
         msg.replyTo.tell(new Gateway.ProductInfo(id, name, description, price, stock_quantity));
-        return this;
+        return Behaviors.same();
     }
 
     private Behavior<Command> onReduceStock(ReduceStock msg) {
@@ -171,13 +171,13 @@ public class Product extends AbstractBehavior<Product.Command> {
         } else {
             msg.replyTo.tell(new OperationResponse(false, "Insufficient stock", stock_quantity));
         }
-        return this;
+        return Behaviors.same();
     }
 
     private Behavior<Command> onRestoreStock(RestoreStock msg) {
         stock_quantity += msg.quantity;
         msg.replyTo.tell(new OperationResponse(true, "Stock restored", stock_quantity));
-        return this;
+        return Behaviors.same();
     }
 }
 
