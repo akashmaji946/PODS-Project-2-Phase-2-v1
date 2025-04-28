@@ -140,18 +140,18 @@ public class PostOrder extends AbstractBehavior<PostOrder.Command> {
             // Validate user_id
             if (!orderRequest.containsKey("user_id") || orderRequest.get("user_id") == null) {
                 replyTo.tell(new Gateway.OrderInfo(orderId, 0, 0, "Invalid order data: Missing user_id", new ArrayList<>()));
-                return Behaviors.stopped();
+                return Behaviors.same();
             }
             userId = (Integer) orderRequest.get("user_id");
             if (getUser(userId) == 404) {
                 replyTo.tell(new Gateway.OrderInfo(orderId, 0, 0, "user actor missing for id " + userId, new ArrayList<>()));
-                return Behaviors.stopped();
+                return Behaviors.same();
             }
     
             // Validate items
             if (!orderRequest.containsKey("items") || !(orderRequest.get("items") instanceof List)) {
                 replyTo.tell(new Gateway.OrderInfo(orderId, 0, 0, "Invalid order data: Missing or invalid items", new ArrayList<>()));
-                return Behaviors.stopped();
+                return Behaviors.same();
             }
             items = (List<Map<String, Object>>) orderRequest.get("items");
     
@@ -167,15 +167,15 @@ public class PostOrder extends AbstractBehavior<PostOrder.Command> {
                 } else {
     
                     replyTo.tell(new Gateway.OrderInfo(orderId, 0, 0, "Product not found: " + prodId, convertItemsToOrderItemInfo(items)));
-                    return Behaviors.stopped();
+                    return Behaviors.same();
                 }
             }
         } catch (Exception e) {
             e.printStackTrace();
             replyTo.tell(new Gateway.OrderInfo(orderId, 0, 0, "Invalid order data", new ArrayList<>()));
-            return Behaviors.stopped();
+            return Behaviors.same();
         }
-        return this;
+        return Behaviors.same();
     }
 
     @Override
@@ -204,7 +204,7 @@ public class PostOrder extends AbstractBehavior<PostOrder.Command> {
                 Gateway.ProductInfo pi = collectedProductInfos.get(prodId);
                 if (pi == null || pi.stock_quantity < quantity) {
                     replyTo.tell(new Gateway.OrderInfo(orderId, 0, 0, "Insufficient stock for product " + prodId, convertItemsToOrderItemInfo(items)));
-                    return Behaviors.stopped();
+                    return Behaviors.same();
                 }
                 totalCost += quantity * pi.price;
             }
@@ -219,7 +219,7 @@ public class PostOrder extends AbstractBehavior<PostOrder.Command> {
             // Debit wallet.
             if (!debitWallet(userId, finalCost)) {
                 replyTo.tell(new Gateway.OrderInfo(orderId, 0, 0, "Insufficient wallet balance", convertItemsToOrderItemInfo(items)));
-                return Behaviors.stopped();
+                return Behaviors.same();
             }
             // Move to Phase 2: Reduce stock.
             pendingStockReductionResponses = items.size();
@@ -235,13 +235,13 @@ public class PostOrder extends AbstractBehavior<PostOrder.Command> {
                 } else {
                     refundWallet(userId, finalCost);
                     replyTo.tell(new Gateway.OrderInfo(orderId, 0, 0, "Product not found: " + prodId, convertItemsToOrderItemInfo(items)));
-                    return Behaviors.stopped();
+                    return Behaviors.same();
                 }
 
             }
             return waitingForStockReduction();
         }
-        return this;
+        return Behaviors.same();
     }
     
     // Helper method to convert List<Map<String, Object>> to List<Order.OrderItemInfo>
@@ -258,8 +258,12 @@ public class PostOrder extends AbstractBehavior<PostOrder.Command> {
     // --- Phase 2 state: Waiting for stock reduction responses ---
     private Receive<Command> waitingForStockReduction() {
         return newReceiveBuilder()
-            .onMessage(StockReductionResponse.class, this::onStockReductionResponse)
-            .build();
+                            .onMessage(StockReductionResponse.class, this::onStockReductionResponse)
+                            .onAnyMessage(msg -> {
+                                getContext().getLog().warn("Unhandled message: {}", msg);
+                                return Behaviors.same();
+                            })
+                            .build();
     }
 
     private Behavior<Command> onStockReductionResponse(StockReductionResponse msg) {
@@ -298,7 +302,7 @@ public class PostOrder extends AbstractBehavior<PostOrder.Command> {
                     replyTo.tell(new Gateway.OrderInfo(orderId, userId, finalCost, "PLACED", orderItemInfos));
 
                     // note here
-                    return Behaviors.stopped();
+                    return Behaviors.same();
 
                 }catch (Exception e){
                     e.printStackTrace();
@@ -323,7 +327,7 @@ public class PostOrder extends AbstractBehavior<PostOrder.Command> {
                         }
                     }
                     replyTo.tell(new Gateway.OrderInfo(orderId, 0, 0, "Stock reduction failed, order cancelled", new ArrayList<>()));
-                    return Behaviors.stopped();
+                    return Behaviors.same();
                 }
            
            
@@ -346,10 +350,10 @@ public class PostOrder extends AbstractBehavior<PostOrder.Command> {
                     }
                 }
                 replyTo.tell(new Gateway.OrderInfo(orderId, 0, 0, "Stock reduction failed, order cancelled", new ArrayList<>()));
-                return Behaviors.stopped();
+                return Behaviors.same();
             }
         }
-        return this;
+        return Behaviors.same();
     }
 
 
